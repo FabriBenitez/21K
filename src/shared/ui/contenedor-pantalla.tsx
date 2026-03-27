@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { type PropsWithChildren } from 'react';
-import { ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { coloresBase, espaciadoBase } from '@/src/shared/theme/tokens-ui';
@@ -71,13 +71,13 @@ const estilos = StyleSheet.create({
   contenidoOscuro: {
     paddingHorizontal: espaciadoBase.lg,
     paddingTop: espaciadoBase.lg,
-    paddingBottom: espaciadoBase.xxl + 12,
+    paddingBottom: Platform.OS === 'ios' ? 150 : 138,
     gap: espaciadoBase.lg,
   },
   contenidoClaro: {
     paddingHorizontal: espaciadoBase.lg,
     paddingTop: espaciadoBase.lg,
-    paddingBottom: espaciadoBase.xxl + 12,
+    paddingBottom: Platform.OS === 'ios' ? 150 : 138,
     gap: espaciadoBase.lg,
   },
   glowSuperior: {

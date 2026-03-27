@@ -17,14 +17,17 @@ export function PantallaSelectorEntrenamiento() {
           Registrar <Text style={estilos.tituloAcento}>entrenamiento</Text>
         </Text>
         <Text style={estilos.subtitulo}>Preparandote para tu primer 21K</Text>
+        <Pressable style={estilos.botonHistorial} onPress={() => router.push('/(tabs)/entrenamientos')}>
+          <Text style={estilos.textoBotonHistorial}>Ver historial</Text>
+        </Pressable>
       </View>
 
       <Pressable style={estilos.tarjetaGrande} onPress={() => router.push('/sesion-gym')}>
         <View style={estilos.circuloIcono}>
           <Dumbbell color={coloresBase.acentoNeon} size={38} strokeWidth={2.4} />
         </View>
-        <Text style={estilos.tituloTarjeta}>GIMNASIO</Text>
-        <Text style={estilos.subtituloTarjeta}>Fuerza y movilidad</Text>
+        <Text style={estilos.tituloTarjeta}>RUTINA GYM</Text>
+        <Text style={estilos.subtituloTarjeta}>Programa dia y ejercicios</Text>
       </Pressable>
 
       <View style={estilos.separadorCentral}>
@@ -77,6 +80,21 @@ const estilos = StyleSheet.create({
     marginTop: espaciadoBase.xs,
     color: coloresBase.textoSecundarioOscuro,
     fontSize: 34 / 2,
+  },
+  botonHistorial: {
+    alignSelf: 'flex-start',
+    marginTop: espaciadoBase.sm,
+    borderRadius: radiosBase.pill,
+    borderWidth: 1,
+    borderColor: '#2E3344',
+    backgroundColor: '#1A1E29',
+    paddingHorizontal: espaciadoBase.md,
+    paddingVertical: 9,
+  },
+  textoBotonHistorial: {
+    color: coloresBase.textoPrincipalOscuro,
+    fontSize: 14,
+    fontWeight: '700',
   },
   tarjetaGrande: {
     borderRadius: 34,

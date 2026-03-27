@@ -19,6 +19,45 @@ export interface ProgresoPesoEjercicio {
   puntos: PuntoPesoEjercicio[];
 }
 
+export interface MaximoPesoEjercicio {
+  nombreEjercicio: string;
+  pesoMaximoKg: number;
+  fecha: string;
+}
+
+function obtenerClaveInicioSemana(fechaIso: string): string {
+  const fecha = new Date(`${fechaIso}T00:00:00`);
+  const diaSemana = fecha.getDay();
+  const deltaHaciaLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+  fecha.setDate(fecha.getDate() + deltaHaciaLunes);
+
+  const anio = fecha.getFullYear();
+  const mes = `${fecha.getMonth() + 1}`.padStart(2, '0');
+  const dia = `${fecha.getDate()}`.padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
+
+function obtenerClavesSemanasObjetivo(totalSemanas: number): string[] {
+  const hoy = new Date();
+  const base = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const diaSemana = base.getDay();
+  const deltaHaciaLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+  const inicioSemanaActual = new Date(base);
+  inicioSemanaActual.setDate(base.getDate() + deltaHaciaLunes);
+
+  const claves: string[] = [];
+  for (let i = totalSemanas - 1; i >= 0; i -= 1) {
+    const fechaSemana = new Date(inicioSemanaActual);
+    fechaSemana.setDate(inicioSemanaActual.getDate() - i * 7);
+    const anio = fechaSemana.getFullYear();
+    const mes = `${fechaSemana.getMonth() + 1}`.padStart(2, '0');
+    const dia = `${fechaSemana.getDate()}`.padStart(2, '0');
+    claves.push(`${anio}-${mes}-${dia}`);
+  }
+
+  return claves;
+}
+
 export function esEntrenamientoRunning(
   entrenamiento: Entrenamiento
 ): entrenamiento is EntrenamientoRunning {
@@ -147,5 +186,100 @@ export function obtenerProgresosPesosGimnasio(
   return progresos;
 }
 
+export function obtenerMaximosPesoPorEjercicio(
+  entrenamientos: Entrenamiento[]
+): MaximoPesoEjercicio[] {
+  const maximosPorEjercicio = new Map<string, MaximoPesoEjercicio>();
+
+  entrenamientos
+    .filter(esEntrenamientoGimnasio)
+    .forEach((entrenamiento) => {
+      entrenamiento.ejercicios.forEach((ejercicio) => {
+        const nombreLimpio = ejercicio.nombre.trim();
+        if (!nombreLimpio) {
+          return;
+        }
+
+        const clave = nombreLimpio.toLowerCase();
+        const maximoActual = maximosPorEjercicio.get(clave);
+
+        if (
+          !maximoActual ||
+          ejercicio.pesoKg > maximoActual.pesoMaximoKg ||
+          (ejercicio.pesoKg === maximoActual.pesoMaximoKg &&
+            entrenamiento.fecha.localeCompare(maximoActual.fecha) > 0)
+        ) {
+          maximosPorEjercicio.set(clave, {
+            nombreEjercicio: nombreLimpio,
+            pesoMaximoKg: ejercicio.pesoKg,
+            fecha: entrenamiento.fecha,
+          });
+        }
+      });
+    });
+
+  return Array.from(maximosPorEjercicio.values()).sort((a, b) => {
+    if (a.pesoMaximoKg !== b.pesoMaximoKg) {
+      return b.pesoMaximoKg - a.pesoMaximoKg;
+    }
+
+    return a.nombreEjercicio.localeCompare(b.nombreEjercicio);
+  });
+}
+
+export function calcularConsistenciaSemanal(
+  entrenamientos: Entrenamiento[],
+  numeroSemanas = 8,
+  minimoSesionesObjetivo = 3
+): number {
+  if (numeroSemanas <= 0 || minimoSesionesObjetivo <= 0) {
+    return 0;
+  }
+
+  const sesionesPorSemana = new Map<string, number>();
+
+  entrenamientos.forEach((entrenamiento) => {
+    const claveSemana = obtenerClaveInicioSemana(entrenamiento.fecha);
+    sesionesPorSemana.set(claveSemana, (sesionesPorSemana.get(claveSemana) ?? 0) + 1);
+  });
+
+  const semanasObjetivo = obtenerClavesSemanasObjetivo(numeroSemanas);
+  const semanasCumplidas = semanasObjetivo.filter(
+    (semana) => (sesionesPorSemana.get(semana) ?? 0) >= minimoSesionesObjetivo
+  ).length;
+
+  return (semanasCumplidas / numeroSemanas) * 100;
+}
+
+export function calcularTendenciaKilometraje(
+  entrenamientos: Entrenamiento[],
+  semanasVentana = 4
+): number {
+  if (semanasVentana <= 0) {
+    return 0;
+  }
+
+  const clavesObjetivo = obtenerClavesSemanasObjetivo(semanasVentana * 2);
+  const clavesPrevias = clavesObjetivo.slice(0, semanasVentana);
+  const clavesRecientes = clavesObjetivo.slice(semanasVentana);
+
+  const kmPorSemana = new Map<string, number>();
+
+  entrenamientos
+    .filter(esEntrenamientoRunning)
+    .forEach((entrenamiento) => {
+      const claveSemana = obtenerClaveInicioSemana(entrenamiento.fecha);
+      kmPorSemana.set(claveSemana, (kmPorSemana.get(claveSemana) ?? 0) + entrenamiento.distanciaKm);
+    });
+
+  const kmPrevios = clavesPrevias.reduce((total, clave) => total + (kmPorSemana.get(clave) ?? 0), 0);
+  const kmRecientes = clavesRecientes.reduce((total, clave) => total + (kmPorSemana.get(clave) ?? 0), 0);
+
+  if (kmPrevios <= 0) {
+    return kmRecientes > 0 ? 100 : 0;
+  }
+
+  return ((kmRecientes - kmPrevios) / kmPrevios) * 100;
+}
 
 

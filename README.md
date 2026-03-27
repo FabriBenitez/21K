@@ -1,50 +1,93 @@
-# Welcome to your Expo app 👋
+# 21K App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicacion movil para corredores amateur que combina running y fuerza para preparar una media maraton (21K).
 
-## Get started
+## Stack
 
-1. Install dependencies
+- React Native
+- Expo + Expo Router
+- TypeScript
+- React Native Paper
+- Supabase
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Scripts
 
 ```bash
-npm run reset-project
+npm install
+npm run start
+npm run android
+npm run ios
+npm run web
+npm run lint
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Arquitectura Base (Bloque 1)
 
-## Learn more
+- Navegacion por archivos con `app/` y `expo-router`.
+- Provider raiz centralizado en `src/shared/providers/proveedor-app.tsx`.
+- Estado global de aplicacion con contexto en `src/shared/state/contexto-app.tsx`.
+- Guardas de navegacion para separar flujo autenticado y no autenticado.
+- Manejo global de errores:
+  - Limite de error de React: `src/shared/errors/limite-error-global.tsx`
+  - Fallback visual reutilizable: `src/shared/errors/pantalla-error-global.tsx`
+  - Error boundary de rutas en `app/_layout.tsx`
+  - Pantalla 404 en `app/+not-found.tsx`
 
-To learn more about developing your project with Expo, look at the following resources:
+## Estructura recomendada
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```text
+app/
+  (auth)/
+  (tabs)/
+  _layout.tsx
+  +not-found.tsx
 
-## Join the community
+src/
+  modules/
+    auth/
+    dashboard/
+    trainings/
+    calendar/
+    statistics/
+    profile/
+  shared/
+    errors/
+    navigation/
+    providers/
+    state/
+    theme/
+    ui/
+    utils/
+```
 
-Join our community of developers creating universal apps.
+## Convenciones
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Rutas centralizadas en `src/shared/navigation/rutas-app.ts`.
+- UI compartida en `src/shared/ui`.
+- Pantallas por modulo en `src/modules/*/ui`.
+- Utilidades puras en `src/shared/utils`.
+
+## Supabase
+
+- Configuracion de entorno: `docs/supabase-configuracion.md`.
+- Esquema y seguridad (Bloque 2): `supabase/migrations/20260326000100_initial_schema.sql`.
+- Seed inicial: `supabase/seed.sql`.
+- Auth real app (Bloque 3): `docs/bloque-3-auth-supabase.md`.
+- Entrenamientos CRUD (Bloque 4): `docs/bloque-4-entrenamientos-crud.md`.
+- Calendario (Bloque 5): `docs/bloque-5-calendario.md`.
+- Dashboard (Bloque 6): `docs/bloque-6-dashboard.md`.
+- Estadisticas (Bloque 7): `docs/bloque-7-estadisticas.md`.
+- Objetivo 21K (Bloque 8): `docs/bloque-8-objetivo-21k.md`.
+- Frases motivacionales (Bloque 9): `docs/bloque-9-frases-motivacionales.md`.
+
+## Estado De Bloques
+
+- Bloque 1: completo
+- Bloque 2: completo
+- Bloque 3: completo
+- Bloque 4: completo
+- Bloque 5: completo
+- Bloque 6: completo
+- Bloque 7: completo
+- Bloque 8: completo
+- Bloque 9: completo

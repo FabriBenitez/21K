@@ -1,10 +1,23 @@
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
 import { Platform } from 'react-native';
 
+import { rutasApp } from '@/src/shared/navigation/rutas-app';
+import { useEstadoApp } from '@/src/shared/state/contexto-app';
 import { BarraTabsNeon } from '@/src/shared/ui/barra-tabs-neon';
+import { PantallaCargandoApp } from '@/src/shared/ui/pantalla-cargando-app';
 
 export default function TabLayout() {
+  const { estadoSesion } = useEstadoApp();
+
+  if (estadoSesion === 'cargando') {
+    return <PantallaCargandoApp mensaje="Cargando entrenamiento..." />;
+  }
+
+  if (estadoSesion !== 'autenticado') {
+    return <Redirect href={rutasApp.auth.login} />;
+  }
+
   return (
     <Tabs
       tabBar={(props) => <BarraTabsNeon {...props} />}

@@ -44,7 +44,7 @@ export function BarraTabsNeon({ state, descriptors, navigation }: BottomTabBarPr
               ]}>
               {esBotonCentral ? (
                 <View style={estilos.fondoBotonCentral}>
-                  <Icono color={coloresBase.fondoOscuro} size={34} strokeWidth={2.5} />
+                  <Icono color={coloresBase.fondoOscuro} size={30} strokeWidth={2.5} />
                 </View>
               ) : (
                 <>
@@ -71,12 +71,12 @@ const estilos = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 10,
+    bottom: 6,
     alignItems: 'center',
   },
   contenedor: {
     width: '92%',
-    minHeight: 84,
+    minHeight: 78,
     borderRadius: radiosBase.pill,
     backgroundColor: 'rgba(16,18,25,0.98)',
     borderWidth: 1,
@@ -84,7 +84,7 @@ const estilos = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: espaciadoBase.lg,
+    paddingHorizontal: espaciadoBase.md,
     paddingVertical: espaciadoBase.xs,
   },
   botonTab: {
@@ -98,7 +98,7 @@ const estilos = StyleSheet.create({
   },
   etiqueta: {
     color: '#8E95AB',
-    fontSize: 11,
+    fontSize: 10,
     letterSpacing: 0.7,
     fontWeight: '700',
   },
@@ -106,14 +106,14 @@ const estilos = StyleSheet.create({
     color: coloresBase.acentoNeon,
   },
   botonCentral: {
-    width: 76,
+    width: 68,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -36,
+    marginTop: -30,
   },
   fondoBotonCentral: {
-    width: 76,
-    height: 76,
+    width: 68,
+    height: 68,
     borderRadius: radiosBase.pill,
     backgroundColor: coloresBase.acentoNeon,
     alignItems: 'center',

@@ -1,8 +1,10 @@
 import { Link, router } from 'expo-router';
-import { Bolt, Mail, Shield } from 'lucide-react-native';
+import { Mail, Shield } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { rutasApp } from '@/src/shared/navigation/rutas-app';
+import { useEstadoApp } from '@/src/shared/state/contexto-app';
 import { BotonPrincipal } from '@/src/shared/ui/boton-principal';
 import { CampoFormulario } from '@/src/shared/ui/campo-formulario';
 import { ContenedorPantalla } from '@/src/shared/ui/contenedor-pantalla';
@@ -12,11 +14,39 @@ import { coloresBase, espaciadoBase, radiosBase, sombrasNeon } from '@/src/share
 export function PantallaLogin() {
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [clave, setClave] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const { iniciarSesion } = useEstadoApp();
+
+  const iniciarSesionCuenta = async () => {
+    if (enviando) {
+      return;
+    }
+
+    if (!correoElectronico.trim() || !clave.trim()) {
+      Alert.alert('Campos incompletos', 'Ingresa correo y contrasena para continuar.');
+      return;
+    }
+
+    setEnviando(true);
+    const resultado = await iniciarSesion(correoElectronico, clave);
+    setEnviando(false);
+
+    if (!resultado.ok) {
+      Alert.alert('No pudimos iniciar sesion', resultado.mensaje ?? 'Intentalo nuevamente.');
+      return;
+    }
+
+    router.replace(rutasApp.tabs.raiz);
+  };
 
   return (
     <ContenedorPantalla modo="oscuro" desplazable estiloContenido={estilos.contenido}>
       <View style={estilos.iconoMarca}>
-        <Bolt color="#111" size={34} strokeWidth={2.8} />
+        <Image
+          source={require('../../../../assets/images/logo-21k.png')}
+          style={estilos.logoMarcaImagen}
+          resizeMode="contain"
+        />
       </View>
 
       <View style={estilos.encabezado}>
@@ -38,7 +68,7 @@ export function PantallaLogin() {
         <CampoFormulario
           etiqueta="Contrasena"
           textoDerechaEtiqueta="OLVIDASTE?"
-          onPressTextoDerechaEtiqueta={() => router.push('/(auth)/recuperar-clave')}
+          onPressTextoDerechaEtiqueta={() => router.push(rutasApp.auth.recuperarClave)}
           placeholder="......"
           valor={clave}
           onChangeText={setClave}
@@ -47,7 +77,12 @@ export function PantallaLogin() {
         />
       </View>
 
-      <BotonPrincipal titulo="Iniciar sesion" onPress={() => router.replace('/(tabs)')} />
+      <BotonPrincipal
+        titulo={enviando ? 'Ingresando...' : 'Iniciar sesion'}
+        onPress={iniciarSesionCuenta}
+        cargando={enviando}
+        deshabilitado={enviando}
+      />
 
       <SeparadorSocial texto="O CONTINUAR CON" />
 
@@ -62,7 +97,7 @@ export function PantallaLogin() {
 
       <View style={estilos.pie}>
         <Text style={estilos.textoPie}>No tienes cuenta?</Text>
-        <Link href="/(auth)/registro" style={estilos.enlacePie}>
+        <Link href={rutasApp.auth.registro} style={estilos.enlacePie}>
           Registrate
         </Link>
       </View>
@@ -77,13 +112,19 @@ const estilos = StyleSheet.create({
     minHeight: '100%',
   },
   iconoMarca: {
-    width: 92,
-    height: 92,
+    width: '100%',
+    minHeight: 120,
     borderRadius: radiosBase.lg,
-    backgroundColor: coloresBase.acentoNeon,
+    backgroundColor: '#0B0D14',
+    borderWidth: 1,
+    borderColor: '#262B38',
     alignItems: 'center',
     justifyContent: 'center',
     ...sombrasNeon.glowSuave,
+  },
+  logoMarcaImagen: {
+    width: '90%',
+    height: 96,
   },
   encabezado: {
     gap: espaciadoBase.sm,

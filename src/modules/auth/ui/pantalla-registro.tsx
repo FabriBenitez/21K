@@ -1,8 +1,10 @@
 import { Link, router } from 'expo-router';
 import { ArrowLeft, Mail, Shield, UserRound } from 'lucide-react-native';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { rutasApp } from '@/src/shared/navigation/rutas-app';
+import { useEstadoApp } from '@/src/shared/state/contexto-app';
 import { BotonPrincipal } from '@/src/shared/ui/boton-principal';
 import { CampoFormulario } from '@/src/shared/ui/campo-formulario';
 import { ContenedorPantalla } from '@/src/shared/ui/contenedor-pantalla';
@@ -14,12 +16,66 @@ export function PantallaRegistro() {
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [clave, setClave] = useState('');
   const [aceptaTerminos, setAceptaTerminos] = useState(true);
+  const [creandoCuenta, setCreandoCuenta] = useState(false);
+  const { registrarCuenta } = useEstadoApp();
+
+  const crearCuenta = async () => {
+    if (creandoCuenta) {
+      return;
+    }
+
+    if (!nombreCompleto.trim() || !correoElectronico.trim() || !clave.trim()) {
+      Alert.alert('Campos incompletos', 'Completa nombre, correo y contrasena.');
+      return;
+    }
+
+    if (!aceptaTerminos) {
+      Alert.alert('Terminos requeridos', 'Debes aceptar terminos y politica para continuar.');
+      return;
+    }
+
+    if (clave.length < 6) {
+      Alert.alert('Contrasena invalida', 'La contrasena debe tener al menos 6 caracteres.');
+      return;
+    }
+
+    setCreandoCuenta(true);
+    const resultado = await registrarCuenta(nombreCompleto, correoElectronico, clave);
+    setCreandoCuenta(false);
+
+    if (!resultado.ok) {
+      Alert.alert('No pudimos crear la cuenta', resultado.mensaje ?? 'Intentalo nuevamente.');
+      return;
+    }
+
+    Alert.alert('Registro exitoso', resultado.mensaje ?? 'Tu cuenta ya esta disponible.', [
+      {
+        text: 'Continuar',
+        onPress: () => {
+          if (resultado.requiereConfirmacion) {
+            router.replace(rutasApp.auth.login);
+            return;
+          }
+
+          router.replace(rutasApp.tabs.raiz);
+        },
+      },
+    ]);
+  };
 
   return (
     <ContenedorPantalla modo="oscuro" desplazable estiloContenido={estilos.contenido}>
       <Pressable style={estilos.botonVolver} onPress={() => router.back()}>
         <ArrowLeft color={coloresBase.textoPrincipalOscuro} size={30} strokeWidth={2.4} />
       </Pressable>
+
+      <View style={estilos.logoMarcaContenedor}>
+        <Image
+          source={require('../../../../assets/images/logo-21k.png')}
+          style={estilos.logoMarcaImagen}
+          resizeMode="contain"
+        />
+      </View>
 
       <View style={estilos.encabezado}>
         <Text style={estilos.titulo}>
@@ -64,7 +120,12 @@ export function PantallaRegistro() {
         </Text>
       </Pressable>
 
-      <BotonPrincipal titulo="Crear cuenta" onPress={() => router.replace('/(tabs)')} />
+      <BotonPrincipal
+        titulo={creandoCuenta ? 'Creando cuenta...' : 'Crear cuenta'}
+        onPress={crearCuenta}
+        cargando={creandoCuenta}
+        deshabilitado={creandoCuenta}
+      />
 
       <SeparadorSocial texto="O REGISTRARTE CON" />
 
@@ -79,7 +140,7 @@ export function PantallaRegistro() {
 
       <View style={estilos.pie}>
         <Text style={estilos.textoPie}>Ya tienes cuenta?</Text>
-        <Link href="/(auth)/login" style={estilos.enlacePie}>
+        <Link href={rutasApp.auth.login} style={estilos.enlacePie}>
           Iniciar sesion
         </Link>
       </View>
@@ -101,6 +162,21 @@ const estilos = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#262B37',
+  },
+  logoMarcaContenedor: {
+    width: '100%',
+    minHeight: 108,
+    borderRadius: radiosBase.lg,
+    borderWidth: 1,
+    borderColor: '#262B38',
+    backgroundColor: '#0B0D14',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...sombrasNeon.glowSuave,
+  },
+  logoMarcaImagen: {
+    width: '88%',
+    height: 88,
   },
   encabezado: {
     gap: espaciadoBase.sm,

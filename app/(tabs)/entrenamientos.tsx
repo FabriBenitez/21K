@@ -1,7 +1,7 @@
-import { Redirect } from 'expo-router';
+import { PantallaEntrenamientos } from '@/src/modules/trainings/ui/pantalla-entrenamientos';
 
 export default function RutaEntrenamientos() {
-  return <Redirect href="/(tabs)/agregar" />;
+  return <PantallaEntrenamientos />;
 }
 
 

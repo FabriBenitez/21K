@@ -7,6 +7,14 @@ export function obtenerFechaIsoActual(): string {
   return `${anio}-${mes}-${dia}`;
 }
 
+export function convertirFechaEnIso(fecha: Date): string {
+  const anio = fecha.getFullYear();
+  const mes = `${fecha.getMonth() + 1}`.padStart(2, '0');
+  const dia = `${fecha.getDate()}`.padStart(2, '0');
+
+  return `${anio}-${mes}-${dia}`;
+}
+
 export function convertirFechaIsoEnUtc(fechaIso: string): Date | null {
   const partes = fechaIso.split('-');
   if (partes.length !== 3) {
@@ -29,6 +37,53 @@ export function convertirFechaIsoEnUtc(fechaIso: string): Date | null {
   }
 
   return fechaUtc;
+}
+
+export function sumarDiasAFechaIso(fechaIso: string, dias: number): string | null {
+  const fechaUtc = convertirFechaIsoEnUtc(fechaIso);
+  if (!fechaUtc) {
+    return null;
+  }
+
+  fechaUtc.setUTCDate(fechaUtc.getUTCDate() + dias);
+  const anio = fechaUtc.getUTCFullYear();
+  const mes = `${fechaUtc.getUTCMonth() + 1}`.padStart(2, '0');
+  const dia = `${fechaUtc.getUTCDate()}`.padStart(2, '0');
+
+  return `${anio}-${mes}-${dia}`;
+}
+
+export function obtenerRangoSemanaIso(fechaBase = new Date()): { inicio: string; fin: string } {
+  const base = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), fechaBase.getDate());
+  const diaSemana = base.getDay(); // 0=domingo
+  const deltaHaciaLunes = diaSemana === 0 ? -6 : 1 - diaSemana;
+
+  const inicio = new Date(base);
+  inicio.setDate(base.getDate() + deltaHaciaLunes);
+
+  const fin = new Date(inicio);
+  fin.setDate(inicio.getDate() + 6);
+
+  return {
+    inicio: convertirFechaEnIso(inicio),
+    fin: convertirFechaEnIso(fin),
+  };
+}
+
+export function obtenerRangoMesIso(anio: number, mes: number): { inicio: string; fin: string } {
+  const inicio = new Date(anio, mes - 1, 1);
+  const fin = new Date(anio, mes, 0);
+
+  return {
+    inicio: convertirFechaEnIso(inicio),
+    fin: convertirFechaEnIso(fin),
+  };
+}
+
+export function obtenerFechaIsoHaceDias(dias: number, fechaBase = new Date()): string {
+  const base = new Date(fechaBase.getFullYear(), fechaBase.getMonth(), fechaBase.getDate());
+  base.setDate(base.getDate() - dias);
+  return convertirFechaEnIso(base);
 }
 
 export function calcularDiasHasta(
