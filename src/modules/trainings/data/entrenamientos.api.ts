@@ -8,6 +8,7 @@ import {
   type TipoRunning,
 } from '@/src/modules/trainings/domain/tipos-entrenamiento';
 import { clienteSupabase } from '@/src/shared/integrations/supabase/cliente-supabase';
+import { obtenerUsuarioAutenticadoId } from '@/src/shared/integrations/supabase/usuario-auth';
 import { obtenerFechaIsoActual } from '@/src/shared/utils/fechas';
 
 interface FilaSesionRunning {
@@ -255,9 +256,14 @@ export async function guardarRegistroRunning(entrada: EntradaSesionRunning): Pro
     return mapearRunning(data as FilaSesionRunning);
   }
 
+  const userId = await obtenerUsuarioAutenticadoId();
+
   const { data, error } = await clienteSupabase
     .from('sesiones_running')
-    .insert(payload)
+    .insert({
+      ...payload,
+      user_id: userId,
+    })
     .select('id, fecha_sesion, distancia_km, duracion_segundos, tipo, ritmo_promedio_seg_km, notas, created_at')
     .single();
 
@@ -330,7 +336,16 @@ export async function guardarRegistroGym(entrada: EntradaSesionGym): Promise<Reg
       throw crearErrorOperacion('No pudimos actualizar los ejercicios de la sesion', errorBorradoEjercicios.message);
     }
   } else {
-    const { data, error } = await clienteSupabase.from('sesiones_gym').insert(payloadSesion).select('id').single();
+    const userId = await obtenerUsuarioAutenticadoId();
+
+    const { data, error } = await clienteSupabase
+      .from('sesiones_gym')
+      .insert({
+        ...payloadSesion,
+        user_id: userId,
+      })
+      .select('id')
+      .single();
 
     if (error) {
       throw crearErrorOperacion('No pudimos crear la sesion de gimnasio', error.message);
@@ -465,10 +480,12 @@ export async function crearPlantillaGym(
   }
 
   const ejerciciosValidos = sanitizarEjercicios(ejercicios);
+  const userId = await obtenerUsuarioAutenticadoId();
 
   const { data, error } = await clienteSupabase
     .from('plantillas_gym')
     .insert({
+      user_id: userId,
       nombre_plantilla: nombreLimpio,
       descripcion: normalizarNotas(descripcion),
     })
