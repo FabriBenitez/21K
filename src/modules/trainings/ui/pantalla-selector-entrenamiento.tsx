@@ -27,7 +27,7 @@ export function PantallaSelectorEntrenamiento() {
           <Dumbbell color={coloresBase.acentoNeon} size={38} strokeWidth={2.4} />
         </View>
         <Text style={estilos.tituloTarjeta}>RUTINA GYM</Text>
-        <Text style={estilos.subtituloTarjeta}>Programa dia y ejercicios</Text>
+        <Text style={estilos.subtituloTarjeta}>Programa semana, dia y ejercicios</Text>
       </Pressable>
 
       <View style={estilos.separadorCentral}>
@@ -46,7 +46,7 @@ export function PantallaSelectorEntrenamiento() {
           <PersonStanding color={coloresBase.acentoNeon} size={38} strokeWidth={2.4} />
         </View>
         <Text style={[estilos.tituloTarjeta, estilos.tituloAcentoTarjeta]}>CARRERA</Text>
-        <Text style={estilos.subtituloTarjeta}>Primer plan de 21K</Text>
+        <Text style={estilos.subtituloTarjeta}>Plan semanal, pasadas, km cortos y fondo</Text>
       </Pressable>
     </ContenedorPantalla>
   );

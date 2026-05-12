@@ -7,13 +7,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { obtenerObjetivo21k } from '@/src/modules/goals/data/objetivos.api';
 import { obtenerFraseMotivacionalContextual, type ContextoFrase } from '@/src/modules/motivation/data/frases.api';
 import {
+  obtenerRutinaGymSemanalPorDia,
+  obtenerRutinaRunningSemanalPorDia,
   listarEntrenamientosDominioPorRango,
   listarHistorialEntrenamientos,
   listarRegistrosGymPorRango,
   listarRegistrosRunningPorRango,
   type RegistroEntrenamiento,
-  type RegistroGym,
 } from '@/src/modules/trainings/data/entrenamientos.api';
+import { obtenerEtiquetaTipoRunning, type RutinaGymSemanal, type RutinaRunningSemanal } from '@/src/modules/trainings/domain/tipos-entrenamiento';
 import {
   calcularRitmoPromedioSemana,
   calcularVolumenTotalGimnasio,
@@ -21,12 +23,12 @@ import {
   obtenerFondoMasLargo,
 } from '@/src/modules/trainings/domain/metricas-entrenamiento';
 import { ContenedorPantalla } from '@/src/shared/ui/contenedor-pantalla';
+import { obtenerDiaSemanaActual, obtenerNombreDiaSemana } from '@/src/shared/utils/dias-semana';
 import {
   calcularDiasHasta,
   obtenerFechaIsoActual,
   obtenerFechaIsoHaceDias,
   obtenerRangoSemanaIso,
-  sumarDiasAFechaIso,
 } from '@/src/shared/utils/fechas';
 import { coloresBase, espaciadoBase, radiosBase } from '@/src/shared/theme/tokens-ui';
 
@@ -43,7 +45,8 @@ interface ResumenDashboard {
   kmAcumulados: number;
   fondoMaximo: number;
   volumenFuerza: number;
-  proximaRutinaGym: RegistroGym | null;
+  rutinaGymHoy: RutinaGymSemanal | null;
+  rutinaRunningHoy: RutinaRunningSemanal | null;
 }
 
 const resumenInicial: ResumenDashboard = {
@@ -57,7 +60,8 @@ const resumenInicial: ResumenDashboard = {
   kmAcumulados: 0,
   fondoMaximo: 0,
   volumenFuerza: 0,
-  proximaRutinaGym: null,
+  rutinaGymHoy: null,
+  rutinaRunningHoy: null,
 };
 
 function resolverContextoFrase(parametros: {
@@ -90,29 +94,77 @@ function describirUltimoEntrenamiento(registro: RegistroEntrenamiento | null): s
   return `${tipo} - ${registro.fechaSesion} - ${registro.descripcion}`;
 }
 
+function formatearDistanciaRutina(distanciaKm?: number): string | null {
+  if (typeof distanciaKm !== 'number') {
+    return null;
+  }
+
+  const esEntera = Number.isInteger(distanciaKm);
+  return `${esEntera ? distanciaKm.toFixed(0) : distanciaKm.toFixed(1)} km`;
+}
+
+function describirRutinaGymHoy(rutina: RutinaGymSemanal | null): string {
+  if (!rutina) {
+    return 'No se entreno.';
+  }
+
+  const ejerciciosPrincipales = rutina.ejercicios
+    .slice(0, 3)
+    .map((ejercicio) => ejercicio.nombre)
+    .join(', ');
+
+  if (ejerciciosPrincipales.length === 0) {
+    return `${rutina.ejercicios.length} ejercicios cargados.`;
+  }
+
+  return `${rutina.ejercicios.length} ejercicios: ${ejerciciosPrincipales}`;
+}
+
+function describirRutinaRunningHoy(rutina: RutinaRunningSemanal | null): string {
+  if (!rutina) {
+    return 'No se entreno.';
+  }
+
+  const partes = [obtenerEtiquetaTipoRunning(rutina.tipo)];
+  const distancia = formatearDistanciaRutina(rutina.distanciaObjetivoKm);
+
+  if (distancia) {
+    partes.push(distancia);
+  }
+
+  if (rutina.detalle) {
+    partes.push(rutina.detalle);
+  }
+
+  return partes.join(' - ');
+}
+
 export function PantallaDashboard() {
   const { width } = useWindowDimensions();
   const esPantallaCompacta = width < 390;
   const [cargando, setCargando] = useState(true);
   const [resumen, setResumen] = useState<ResumenDashboard>(resumenInicial);
+  const diaSemanaActual = obtenerDiaSemanaActual();
+  const nombreDiaActual = obtenerNombreDiaSemana(diaSemanaActual);
 
   const cargarDashboard = useCallback(async () => {
     try {
       setCargando(true);
 
       const hoy = obtenerFechaIsoActual();
+      const diaActual = obtenerDiaSemanaActual();
       const rangoSemana = obtenerRangoSemanaIso();
       const fechaHace84Dias = obtenerFechaIsoHaceDias(84);
-      const fechaLimiteRutinas = sumarDiasAFechaIso(hoy, 120) ?? hoy;
 
-      const [runningSemana, gymSemana, historial, objetivo, entrenamientosUltimas12Semanas, rutinasGymProgramadas] =
+      const [runningSemana, gymSemana, historial, objetivo, entrenamientosUltimas12Semanas, rutinaGymHoy, rutinaRunningHoy] =
         await Promise.all([
           listarRegistrosRunningPorRango(rangoSemana.inicio, rangoSemana.fin),
           listarRegistrosGymPorRango(rangoSemana.inicio, rangoSemana.fin),
           listarHistorialEntrenamientos(40),
           obtenerObjetivo21k(),
           listarEntrenamientosDominioPorRango(fechaHace84Dias, hoy),
-          listarRegistrosGymPorRango(hoy, fechaLimiteRutinas),
+          obtenerRutinaGymSemanalPorDia(diaActual),
+          obtenerRutinaRunningSemanalPorDia(diaActual),
         ]);
 
       const kmSemana = runningSemana.reduce((acumulado, item) => acumulado + item.distanciaKm, 0);
@@ -139,8 +191,6 @@ export function PantallaDashboard() {
       });
       const fraseMotivacional =
         (await obtenerFraseMotivacionalContextual(contextoFrase))?.frase ?? resumenInicial.fraseMotivacional;
-      const proximaRutinaGym =
-        [...rutinasGymProgramadas].sort((a, b) => a.fechaSesion.localeCompare(b.fechaSesion))[0] ?? null;
 
       setResumen({
         kmSemana,
@@ -155,7 +205,8 @@ export function PantallaDashboard() {
         kmAcumulados,
         fondoMaximo,
         volumenFuerza,
-        proximaRutinaGym,
+        rutinaGymHoy,
+        rutinaRunningHoy,
       });
     } catch (error) {
       const mensaje = error instanceof Error ? error.message : 'No se pudo cargar la pantalla de estadisticas.';
@@ -219,35 +270,47 @@ export function PantallaDashboard() {
 
       <View style={estilos.tarjetaSemana}>
         <Text style={[estilos.tituloTarjeta, esPantallaCompacta ? estilos.tituloTarjetaCompacto : null]}>
-          Proxima rutina de gym
+          Rutina de hoy - {nombreDiaActual}
         </Text>
-        {resumen.proximaRutinaGym ? (
-          <>
-            <Text style={estilos.textoTarjeta}>Dia: {resumen.proximaRutinaGym.fechaSesion}</Text>
-            <Text style={estilos.textoTarjeta}>
-              Ejercicios: {resumen.proximaRutinaGym.ejercicios.length}
-            </Text>
-            <Pressable
-              style={estilos.botonEditar}
-              onPress={() => {
-                const rutina = resumen.proximaRutinaGym;
-                if (!rutina) {
-                  return;
-                }
 
-                router.push({ pathname: '/sesion-gym', params: { gymId: rutina.id } });
-              }}>
-              <Text style={estilos.textoBotonEditar}>Editar rutina</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Text style={estilos.textoTarjeta}>No tienes rutina de gym programada.</Text>
-            <Pressable style={estilos.botonEditar} onPress={() => router.push('/sesion-gym')}>
-              <Text style={estilos.textoBotonEditar}>Crear rutina</Text>
-            </Pressable>
-          </>
-        )}
+        <View style={estilos.bloqueRutinaHoy}>
+          <Text style={estilos.etiquetaRutinaHoy}>GYM</Text>
+          <Text style={estilos.textoTarjeta}>{describirRutinaGymHoy(resumen.rutinaGymHoy)}</Text>
+          {resumen.rutinaGymHoy?.notas ? (
+            <Text style={estilos.textoRutinaSecundario}>{resumen.rutinaGymHoy.notas}</Text>
+          ) : null}
+          <Pressable
+            style={estilos.botonEditar}
+            onPress={() =>
+              router.push({
+                pathname: '/sesion-gym',
+                params: { diaSemana: diaSemanaActual.toString() },
+              })
+            }>
+            <Text style={estilos.textoBotonEditar}>
+              {resumen.rutinaGymHoy ? 'Editar gym' : 'Configurar gym'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={estilos.separadorInternoRutina} />
+
+        <View style={estilos.bloqueRutinaHoy}>
+          <Text style={estilos.etiquetaRutinaHoy}>RUNNING</Text>
+          <Text style={estilos.textoTarjeta}>{describirRutinaRunningHoy(resumen.rutinaRunningHoy)}</Text>
+          <Pressable
+            style={estilos.botonEditar}
+            onPress={() =>
+              router.push({
+                pathname: '/registro-running',
+                params: { diaSemana: diaSemanaActual.toString() },
+              })
+            }>
+            <Text style={estilos.textoBotonEditar}>
+              {resumen.rutinaRunningHoy ? 'Editar running' : 'Configurar running'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={estilos.tarjetaUltimo}>
@@ -426,6 +489,25 @@ const estilos = StyleSheet.create({
     color: '#B2BAD0',
     fontSize: 15,
     lineHeight: 22,
+  },
+  bloqueRutinaHoy: {
+    gap: 8,
+  },
+  etiquetaRutinaHoy: {
+    color: coloresBase.acentoNeon,
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  textoRutinaSecundario: {
+    color: '#8F98AF',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  separadorInternoRutina: {
+    height: 1,
+    backgroundColor: '#252A38',
+    marginVertical: 4,
   },
   tarjetaUltimo: {
     borderRadius: radiosBase.lg,

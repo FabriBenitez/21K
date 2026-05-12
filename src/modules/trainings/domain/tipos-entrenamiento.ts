@@ -1,5 +1,19 @@
+import { type DiaSemana } from '@/src/shared/utils/dias-semana';
+
 export type TipoEntrenamiento = 'running' | 'gimnasio';
 export type TipoRunning = 'rodaje_suave' | 'series' | 'fondo_largo' | 'tempo' | 'recuperacion';
+
+export const tiposRunningDisponibles: { valor: TipoRunning; etiqueta: string }[] = [
+  { valor: 'rodaje_suave', etiqueta: 'KM cortos' },
+  { valor: 'series', etiqueta: 'Pasadas' },
+  { valor: 'fondo_largo', etiqueta: 'Fondo' },
+  { valor: 'tempo', etiqueta: 'Tempo' },
+  { valor: 'recuperacion', etiqueta: 'Recuperacion' },
+];
+
+export function obtenerEtiquetaTipoRunning(tipo: TipoRunning): string {
+  return tiposRunningDisponibles.find((item) => item.valor === tipo)?.etiqueta ?? 'Running';
+}
 
 export interface BaseEntrenamiento {
   id: string;
@@ -58,6 +72,31 @@ export interface PlantillaGym {
   nombre: string;
   descripcion?: string;
   ejercicios: EntradaEjercicioGym[];
+}
+
+export interface EntradaRutinaGymSemanal {
+  id?: string;
+  diaSemana: DiaSemana;
+  notas?: string;
+  ejercicios: EntradaEjercicioGym[];
+}
+
+export interface RutinaGymSemanal extends EntradaRutinaGymSemanal {
+  id: string;
+  createdAt: string;
+}
+
+export interface EntradaRutinaRunningSemanal {
+  id?: string;
+  diaSemana: DiaSemana;
+  tipo: TipoRunning;
+  detalle?: string;
+  distanciaObjetivoKm?: number;
+}
+
+export interface RutinaRunningSemanal extends EntradaRutinaRunningSemanal {
+  id: string;
+  createdAt: string;
 }
 
 

@@ -1,27 +1,28 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, CalendarDays, Clock3, PersonStanding, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, CalendarDays, Clock3, PersonStanding, Save, Trash2 } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
   eliminarRegistroRunning,
+  eliminarRutinaRunningSemanal,
   guardarRegistroRunning,
+  guardarRutinaRunningSemanal,
+  listarRutinasRunningSemanales,
   obtenerRegistroRunning,
   type RegistroRunning,
 } from '@/src/modules/trainings/data/entrenamientos.api';
-import { type TipoRunning } from '@/src/modules/trainings/domain/tipos-entrenamiento';
+import {
+  obtenerEtiquetaTipoRunning,
+  tiposRunningDisponibles,
+  type RutinaRunningSemanal,
+  type TipoRunning,
+} from '@/src/modules/trainings/domain/tipos-entrenamiento';
 import { BotonPrincipal } from '@/src/shared/ui/boton-principal';
 import { ContenedorPantalla } from '@/src/shared/ui/contenedor-pantalla';
+import { diasSemanaOrdenados, esDiaSemana, obtenerDiaSemanaActual, obtenerNombreDiaSemana, type DiaSemana } from '@/src/shared/utils/dias-semana';
 import { obtenerFechaIsoActual } from '@/src/shared/utils/fechas';
 import { coloresBase, espaciadoBase, radiosBase } from '@/src/shared/theme/tokens-ui';
-
-const tiposRunning: { valor: TipoRunning; etiqueta: string }[] = [
-  { valor: 'rodaje_suave', etiqueta: 'Rodaje suave' },
-  { valor: 'series', etiqueta: 'Series' },
-  { valor: 'fondo_largo', etiqueta: 'Fondo largo' },
-  { valor: 'tempo', etiqueta: 'Tempo' },
-  { valor: 'recuperacion', etiqueta: 'Recuperacion' },
-];
 
 function parsearEntero(valor: string): number {
   const numero = Number.parseInt(valor, 10);
@@ -44,12 +45,22 @@ function partirDuracionSegundos(duracionSegundos: number) {
   };
 }
 
+function resolverDiaSemanaInicial(valor?: string): DiaSemana {
+  const numero = Number.parseInt(valor ?? '', 10);
+  return esDiaSemana(numero) ? numero : obtenerDiaSemanaActual();
+}
+
+function ordenarRutinasPorDia<T extends { diaSemana: DiaSemana }>(rutinas: T[]) {
+  return [...rutinas].sort((a, b) => a.diaSemana - b.diaSemana);
+}
+
 export function PantallaRegistroRunningManual() {
-  const parametros = useLocalSearchParams<{ runningId?: string | string[]; fecha?: string | string[] }>();
+  const parametros = useLocalSearchParams<{ runningId?: string | string[]; fecha?: string | string[]; diaSemana?: string | string[] }>();
   const runningId = Array.isArray(parametros.runningId)
     ? parametros.runningId[0]
     : parametros.runningId;
   const fechaPrefijada = Array.isArray(parametros.fecha) ? parametros.fecha[0] : parametros.fecha;
+  const diaSemanaPrefijado = Array.isArray(parametros.diaSemana) ? parametros.diaSemana[0] : parametros.diaSemana;
 
   const [cargando, setCargando] = useState(Boolean(runningId));
   const [guardando, setGuardando] = useState(false);
@@ -63,7 +74,21 @@ export function PantallaRegistroRunningManual() {
   const [tipo, setTipo] = useState<TipoRunning>('rodaje_suave');
   const [notas, setNotas] = useState('');
 
+  const [rutinasSemanales, setRutinasSemanales] = useState<RutinaRunningSemanal[]>([]);
+  const [diaSemanaSeleccionado, setDiaSemanaSeleccionado] = useState<DiaSemana>(() =>
+    resolverDiaSemanaInicial(diaSemanaPrefijado)
+  );
+  const [tipoRutinaSemanal, setTipoRutinaSemanal] = useState<TipoRunning>('rodaje_suave');
+  const [detalleRutinaSemanal, setDetalleRutinaSemanal] = useState('');
+  const [distanciaRutinaSemanal, setDistanciaRutinaSemanal] = useState('');
+  const [guardandoRutinaSemanal, setGuardandoRutinaSemanal] = useState(false);
+  const [eliminandoRutinaSemanalActual, setEliminandoRutinaSemanalActual] = useState(false);
+
   const tituloPantalla = runningId ? 'Editar corrida' : 'Registrar corrida manual';
+  const rutinaSemanalActiva = useMemo(
+    () => rutinasSemanales.find((rutina) => rutina.diaSemana === diaSemanaSeleccionado) ?? null,
+    [diaSemanaSeleccionado, rutinasSemanales]
+  );
 
   useEffect(() => {
     if (!runningId && fechaPrefijada) {
@@ -72,23 +97,48 @@ export function PantallaRegistroRunningManual() {
   }, [fechaPrefijada, runningId]);
 
   useEffect(() => {
-    if (!runningId) {
+    if (!diaSemanaPrefijado) {
       return;
     }
 
+    const numero = Number.parseInt(diaSemanaPrefijado, 10);
+    if (esDiaSemana(numero)) {
+      setDiaSemanaSeleccionado(numero);
+    }
+  }, [diaSemanaPrefijado]);
+
+  useEffect(() => {
+    setTipoRutinaSemanal(rutinaSemanalActiva?.tipo ?? 'rodaje_suave');
+    setDetalleRutinaSemanal(rutinaSemanalActiva?.detalle ?? '');
+    setDistanciaRutinaSemanal(
+      typeof rutinaSemanalActiva?.distanciaObjetivoKm === 'number'
+        ? rutinaSemanalActiva.distanciaObjetivoKm.toString()
+        : ''
+    );
+  }, [rutinaSemanalActiva, diaSemanaSeleccionado]);
+
+  useEffect(() => {
     let montado = true;
 
-    const cargarRegistro = async () => {
+    const cargar = async () => {
       try {
-        const registro = await obtenerRegistroRunning(runningId);
+        const [registro, rutinas] = await Promise.all([
+          runningId ? obtenerRegistroRunning(runningId) : Promise.resolve(null),
+          listarRutinasRunningSemanales(),
+        ]);
+
         if (!montado) {
           return;
         }
 
+        setRutinasSemanales(ordenarRutinasPorDia(rutinas));
+
         if (!registro) {
-          Alert.alert('No encontramos la corrida', 'Puede que haya sido eliminada.', [
-            { text: 'Volver', onPress: () => router.back() },
-          ]);
+          if (runningId) {
+            Alert.alert('No encontramos la corrida', 'Puede que haya sido eliminada.', [
+              { text: 'Volver', onPress: () => router.back() },
+            ]);
+          }
           return;
         }
 
@@ -107,7 +157,7 @@ export function PantallaRegistroRunningManual() {
       }
     };
 
-    cargarRegistro();
+    void cargar();
 
     return () => {
       montado = false;
@@ -199,6 +249,78 @@ export function PantallaRegistroRunningManual() {
     ]);
   };
 
+  const guardarRutinaSemanalActual = async () => {
+    if (guardandoRutinaSemanal || eliminandoRutinaSemanalActual) {
+      return;
+    }
+
+    const distanciaObjetivoNumero = Number.parseFloat(distanciaRutinaSemanal.replace(',', '.'));
+    const distanciaObjetivo =
+      distanciaRutinaSemanal.trim().length > 0 && Number.isFinite(distanciaObjetivoNumero)
+        ? distanciaObjetivoNumero
+        : undefined;
+
+    if (distanciaRutinaSemanal.trim().length > 0 && !distanciaObjetivo) {
+      Alert.alert('Distancia invalida', 'La distancia semanal debe ser un numero mayor a 0.');
+      return;
+    }
+
+    try {
+      setGuardandoRutinaSemanal(true);
+      const rutinaGuardada = await guardarRutinaRunningSemanal({
+        id: rutinaSemanalActiva?.id,
+        diaSemana: diaSemanaSeleccionado,
+        tipo: tipoRutinaSemanal,
+        detalle: detalleRutinaSemanal,
+        distanciaObjetivoKm: distanciaObjetivo,
+      });
+
+      setRutinasSemanales((actual) =>
+        ordenarRutinasPorDia([
+          ...actual.filter((rutina) => rutina.diaSemana !== rutinaGuardada.diaSemana),
+          rutinaGuardada,
+        ])
+      );
+
+      Alert.alert(
+        'Plan semanal guardado',
+        `Quedo cargado para ${obtenerNombreDiaSemana(diaSemanaSeleccionado, { capitalizar: false })}.`
+      );
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'No se pudo guardar la rutina semanal.';
+      Alert.alert('Error', mensaje);
+    } finally {
+      setGuardandoRutinaSemanal(false);
+    }
+  };
+
+  const eliminarRutinaSemanalSeleccionada = async () => {
+    if (!rutinaSemanalActiva || guardandoRutinaSemanal || eliminandoRutinaSemanalActual) {
+      return;
+    }
+
+    Alert.alert('Eliminar plan semanal', 'Ese dia quedara sin plan de running.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setEliminandoRutinaSemanalActual(true);
+            await eliminarRutinaRunningSemanal(rutinaSemanalActiva.id);
+            setRutinasSemanales((actual) => actual.filter((rutina) => rutina.id !== rutinaSemanalActiva.id));
+            Alert.alert('Plan eliminado', 'Ese dia ahora figura como "No se entreno".');
+          } catch (error) {
+            const mensaje = error instanceof Error ? error.message : 'No se pudo eliminar la rutina semanal.';
+            Alert.alert('Error', mensaje);
+          } finally {
+            setEliminandoRutinaSemanalActual(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ContenedorPantalla modo="oscuro" desplazable estiloContenido={estilos.contenido}>
       <View style={estilos.encabezadoSuperior}>
@@ -215,10 +337,127 @@ export function PantallaRegistroRunningManual() {
         )}
       </View>
 
+      <View style={estilos.tarjetaPlanSemanal}>
+        <Text style={estilos.tituloBloque}>Plan semanal running</Text>
+        <Text style={estilos.subtituloBloque}>
+          Define que se corre cada dia para que el dashboard te lo muestre automaticamente.
+        </Text>
+
+        <View style={estilos.filaDiasSemana}>
+          {diasSemanaOrdenados.map((diaSemana) => {
+            const tienePlan = rutinasSemanales.some((rutina) => rutina.diaSemana === diaSemana);
+            const estaActivo = diaSemana === diaSemanaSeleccionado;
+
+            return (
+              <Pressable
+                key={diaSemana}
+                style={[
+                  estilos.chipDiaSemana,
+                  estaActivo ? estilos.chipDiaSemanaActivo : null,
+                  tienePlan && !estaActivo ? estilos.chipDiaSemanaCargado : null,
+                ]}
+                onPress={() => setDiaSemanaSeleccionado(diaSemana)}>
+                <Text
+                  style={[
+                    estilos.textoChipDiaSemana,
+                    estaActivo ? estilos.textoChipDiaSemanaActivo : null,
+                  ]}>
+                  {obtenerNombreDiaSemana(diaSemana, { abreviado: true })}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={estilos.textoEstadoPlan}>
+          {rutinaSemanalActiva
+            ? `${obtenerNombreDiaSemana(diaSemanaSeleccionado)}: ${obtenerEtiquetaTipoRunning(rutinaSemanalActiva.tipo)}`
+            : `${obtenerNombreDiaSemana(diaSemanaSeleccionado)} sin plan. Si no cargas nada, en Home dira "No se entreno."`}
+        </Text>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>TIPO DE ENTRENAMIENTO</Text>
+          <View style={estilos.filaTipos}>
+            {tiposRunningDisponibles.map((opcion) => (
+              <Pressable
+                key={opcion.valor}
+                style={[
+                  estilos.chipTipo,
+                  tipoRutinaSemanal === opcion.valor ? estilos.chipTipoActivo : null,
+                ]}
+                onPress={() => setTipoRutinaSemanal(opcion.valor)}>
+                <Text
+                  style={[
+                    estilos.textoChipTipo,
+                    tipoRutinaSemanal === opcion.valor ? estilos.textoChipTipoActivo : null,
+                  ]}>
+                  {opcion.etiqueta}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>DETALLE DEL DIA</Text>
+          <TextInput
+            value={detalleRutinaSemanal}
+            onChangeText={setDetalleRutinaSemanal}
+            style={estilos.inputNotas}
+            placeholder="Ej: 8x400, 6 km suaves, fondo progresivo."
+            placeholderTextColor="#5F667A"
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>DISTANCIA OBJETIVO (OPCIONAL)</Text>
+          <View style={estilos.campoGrande}>
+            <TextInput
+              value={distanciaRutinaSemanal}
+              onChangeText={(valor) => setDistanciaRutinaSemanal(valor.replace(/[^0-9.,]/g, '').replace(',', '.'))}
+              style={estilos.inputGrande}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#5F667A"
+            />
+            <Text style={estilos.sufijoCampo}>km</Text>
+          </View>
+        </View>
+
+        <View style={estilos.filaAccionesPlan}>
+          <Pressable
+            style={estilos.botonPlanPrincipal}
+            onPress={guardarRutinaSemanalActual}
+            disabled={guardandoRutinaSemanal || eliminandoRutinaSemanalActual}>
+            <Save color={coloresBase.fondoOscuro} size={18} />
+            <Text style={estilos.textoBotonPlanPrincipal}>
+              {guardandoRutinaSemanal ? 'Guardando...' : 'Guardar dia'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[estilos.botonPlanSecundario, !rutinaSemanalActiva ? estilos.botonDeshabilitado : null]}
+            onPress={eliminarRutinaSemanalSeleccionada}
+            disabled={!rutinaSemanalActiva || guardandoRutinaSemanal || eliminandoRutinaSemanalActual}>
+            <Trash2 color={rutinaSemanalActiva ? '#FF8A8A' : '#5B6070'} size={18} />
+            <Text
+              style={[
+                estilos.textoBotonPlanSecundario,
+                !rutinaSemanalActiva ? estilos.textoBotonDeshabilitado : null,
+              ]}>
+              {eliminandoRutinaSemanalActual ? 'Eliminando...' : 'Borrar dia'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={estilos.separadorSeccion} />
+
       <View style={estilos.alertaMeta}>
         <PersonStanding color={coloresBase.acentoNeon} size={22} strokeWidth={2.4} />
         <View style={estilos.alertaTexto}>
-          <Text style={estilos.alertaTitulo}>Camino al 21K</Text>
+          <Text style={estilos.alertaTitulo}>Sesion puntual</Text>
           <Text style={estilos.alertaMensaje}>
             Registra distancia y tiempo para medir ritmo y constancia de forma confiable.
           </Text>
@@ -269,7 +508,7 @@ export function PantallaRegistroRunningManual() {
       <View style={estilos.bloqueCampo}>
         <Text style={estilos.etiqueta}>TIPO DE CORRIDA</Text>
         <View style={estilos.filaTipos}>
-          {tiposRunning.map((opcion) => (
+          {tiposRunningDisponibles.map((opcion) => (
             <Pressable
               key={opcion.valor}
               style={[estilos.chipTipo, tipo === opcion.valor ? estilos.chipTipoActivo : null]}
@@ -373,6 +612,106 @@ const estilos = StyleSheet.create({
     color: coloresBase.textoPrincipalOscuro,
     fontSize: 24,
     fontWeight: '800',
+  },
+  tarjetaPlanSemanal: {
+    borderRadius: radiosBase.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(216,255,62,0.35)',
+    backgroundColor: 'rgba(216,255,62,0.08)',
+    padding: espaciadoBase.md,
+    gap: espaciadoBase.md,
+  },
+  tituloBloque: {
+    color: coloresBase.textoPrincipalOscuro,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  subtituloBloque: {
+    color: '#AAB58D',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  filaDiasSemana: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: espaciadoBase.xs,
+  },
+  chipDiaSemana: {
+    minWidth: 62,
+    borderRadius: radiosBase.pill,
+    borderWidth: 1,
+    borderColor: '#2E3343',
+    backgroundColor: '#232633',
+    paddingHorizontal: espaciadoBase.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  chipDiaSemanaActivo: {
+    borderColor: coloresBase.acentoNeon,
+    backgroundColor: coloresBase.acentoNeon,
+  },
+  chipDiaSemanaCargado: {
+    borderColor: 'rgba(216,255,62,0.45)',
+    backgroundColor: 'rgba(216,255,62,0.12)',
+  },
+  textoChipDiaSemana: {
+    color: '#B2BAD0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  textoChipDiaSemanaActivo: {
+    color: coloresBase.fondoOscuro,
+  },
+  textoEstadoPlan: {
+    color: '#CBD596',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  filaAccionesPlan: {
+    flexDirection: 'row',
+    gap: espaciadoBase.sm,
+  },
+  botonPlanPrincipal: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: radiosBase.md,
+    backgroundColor: coloresBase.acentoNeon,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  textoBotonPlanPrincipal: {
+    color: coloresBase.fondoOscuro,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  botonPlanSecundario: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: radiosBase.md,
+    borderWidth: 1,
+    borderColor: '#364055',
+    backgroundColor: '#202430',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  textoBotonPlanSecundario: {
+    color: '#FF9A9A',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  botonDeshabilitado: {
+    opacity: 0.55,
+  },
+  textoBotonDeshabilitado: {
+    color: '#7F869B',
+  },
+  separadorSeccion: {
+    height: 1,
+    backgroundColor: '#252A39',
   },
   alertaMeta: {
     borderRadius: radiosBase.lg,
@@ -524,4 +863,3 @@ const estilos = StyleSheet.create({
     fontSize: 16,
   },
 });
-

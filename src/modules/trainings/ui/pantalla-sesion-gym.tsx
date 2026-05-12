@@ -8,13 +8,17 @@ import {
   crearPlantillaGym,
   duplicarRegistroGym,
   eliminarRegistroGym,
+  eliminarRutinaGymSemanal,
   guardarRegistroGym,
+  guardarRutinaGymSemanal,
   listarPlantillasGym,
+  listarRutinasGymSemanales,
   obtenerRegistroGym,
 } from '@/src/modules/trainings/data/entrenamientos.api';
-import { type EntradaEjercicioGym, type PlantillaGym } from '@/src/modules/trainings/domain/tipos-entrenamiento';
+import { type EntradaEjercicioGym, type PlantillaGym, type RutinaGymSemanal } from '@/src/modules/trainings/domain/tipos-entrenamiento';
 import { BotonPrincipal } from '@/src/shared/ui/boton-principal';
 import { ContenedorPantalla } from '@/src/shared/ui/contenedor-pantalla';
+import { diasSemanaOrdenados, esDiaSemana, obtenerDiaSemanaActual, obtenerNombreDiaSemana, type DiaSemana } from '@/src/shared/utils/dias-semana';
 import { convertirFechaIsoEnUtc, convertirFechaEnIso, obtenerFechaIsoActual } from '@/src/shared/utils/fechas';
 import { coloresBase, espaciadoBase, radiosBase } from '@/src/shared/theme/tokens-ui';
 
@@ -96,10 +100,48 @@ function obtenerFechaSesionDesdeIso(fechaIso: string): Date {
   return new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
 }
 
+function resolverDiaSemanaInicial(valor?: string): DiaSemana {
+  const numero = Number.parseInt(valor ?? '', 10);
+  return esDiaSemana(numero) ? numero : obtenerDiaSemanaActual();
+}
+
+function actualizarEjercicioLista(
+  ejercicios: EjercicioEditable[],
+  idLocal: string,
+  campo: keyof EjercicioEditable,
+  valor: string
+) {
+  return ejercicios.map((ejercicio) =>
+    ejercicio.idLocal === idLocal
+      ? {
+          ...ejercicio,
+          [campo]: valor,
+        }
+      : ejercicio
+  );
+}
+
+function agregarEjercicioLista(ejercicios: EjercicioEditable[]) {
+  return [...ejercicios, crearEjercicioVacio()];
+}
+
+function quitarEjercicioLista(ejercicios: EjercicioEditable[], idLocal: string) {
+  if (ejercicios.length <= 1) {
+    return ejercicios;
+  }
+
+  return ejercicios.filter((ejercicio) => ejercicio.idLocal !== idLocal);
+}
+
+function ordenarRutinasPorDia<T extends { diaSemana: DiaSemana }>(rutinas: T[]) {
+  return [...rutinas].sort((a, b) => a.diaSemana - b.diaSemana);
+}
+
 export function PantallaSesionGym() {
-  const parametros = useLocalSearchParams<{ gymId?: string | string[]; fecha?: string | string[] }>();
+  const parametros = useLocalSearchParams<{ gymId?: string | string[]; fecha?: string | string[]; diaSemana?: string | string[] }>();
   const gymId = Array.isArray(parametros.gymId) ? parametros.gymId[0] : parametros.gymId;
   const fechaPrefijada = Array.isArray(parametros.fecha) ? parametros.fecha[0] : parametros.fecha;
+  const diaSemanaPrefijado = Array.isArray(parametros.diaSemana) ? parametros.diaSemana[0] : parametros.diaSemana;
 
   const [cargando, setCargando] = useState(Boolean(gymId));
   const [guardando, setGuardando] = useState(false);
@@ -115,7 +157,20 @@ export function PantallaSesionGym() {
   const [plantillasUsuario, setPlantillasUsuario] = useState<PlantillaGym[]>([]);
   const [nombrePlantilla, setNombrePlantilla] = useState('');
 
+  const [rutinasSemanales, setRutinasSemanales] = useState<RutinaGymSemanal[]>([]);
+  const [diaSemanaSeleccionado, setDiaSemanaSeleccionado] = useState<DiaSemana>(() =>
+    resolverDiaSemanaInicial(diaSemanaPrefijado)
+  );
+  const [notasRutinaSemanal, setNotasRutinaSemanal] = useState('');
+  const [ejerciciosRutinaSemanal, setEjerciciosRutinaSemanal] = useState<EjercicioEditable[]>([crearEjercicioVacio()]);
+  const [guardandoRutinaSemanal, setGuardandoRutinaSemanal] = useState(false);
+  const [eliminandoRutinaSemanalActual, setEliminandoRutinaSemanalActual] = useState(false);
+
   const plantillasDisponibles = useMemo(() => [...plantillasBase, ...plantillasUsuario], [plantillasUsuario]);
+  const rutinaSemanalActiva = useMemo(
+    () => rutinasSemanales.find((rutina) => rutina.diaSemana === diaSemanaSeleccionado) ?? null,
+    [diaSemanaSeleccionado, rutinasSemanales]
+  );
   const titulo = gymId ? 'Editar rutina de gym' : 'Nueva rutina de gym';
 
   useEffect(() => {
@@ -125,13 +180,32 @@ export function PantallaSesionGym() {
   }, [fechaPrefijada, gymId]);
 
   useEffect(() => {
+    if (!diaSemanaPrefijado) {
+      return;
+    }
+
+    const numero = Number.parseInt(diaSemanaPrefijado, 10);
+    if (esDiaSemana(numero)) {
+      setDiaSemanaSeleccionado(numero);
+    }
+  }, [diaSemanaPrefijado]);
+
+  useEffect(() => {
+    setNotasRutinaSemanal(rutinaSemanalActiva?.notas ?? '');
+    setEjerciciosRutinaSemanal(
+      rutinaSemanalActiva ? rutinaSemanalActiva.ejercicios.map(mapearEjercicioEditable) : [crearEjercicioVacio()]
+    );
+  }, [rutinaSemanalActiva, diaSemanaSeleccionado]);
+
+  useEffect(() => {
     let montado = true;
 
     const cargar = async () => {
       try {
-        const [sesion, plantillas] = await Promise.all([
+        const [sesion, plantillas, rutinas] = await Promise.all([
           gymId ? obtenerRegistroGym(gymId) : Promise.resolve(null),
           listarPlantillasGym(),
+          listarRutinasGymSemanales(),
         ]);
 
         if (!montado) {
@@ -139,6 +213,7 @@ export function PantallaSesionGym() {
         }
 
         setPlantillasUsuario(plantillas);
+        setRutinasSemanales(ordenarRutinasPorDia(rutinas));
 
         if (gymId) {
           if (!sesion) {
@@ -166,39 +241,12 @@ export function PantallaSesionGym() {
       }
     };
 
-    cargar();
+    void cargar();
 
     return () => {
       montado = false;
     };
   }, [gymId]);
-
-  const actualizarEjercicio = (idLocal: string, campo: keyof EjercicioEditable, valor: string) => {
-    setEjercicios((actual) =>
-      actual.map((ejercicio) =>
-        ejercicio.idLocal === idLocal
-          ? {
-              ...ejercicio,
-              [campo]: valor,
-            }
-          : ejercicio
-      )
-    );
-  };
-
-  const agregarEjercicio = () => {
-    setEjercicios((actual) => [...actual, crearEjercicioVacio()]);
-  };
-
-  const quitarEjercicio = (idLocal: string) => {
-    setEjercicios((actual) => {
-      if (actual.length <= 1) {
-        return actual;
-      }
-
-      return actual.filter((ejercicio) => ejercicio.idLocal !== idLocal);
-    });
-  };
 
   const aplicarPlantilla = (plantilla: PlantillaGym) => {
     setEjercicios(plantilla.ejercicios.map(mapearEjercicioEditable));
@@ -326,6 +374,66 @@ export function PantallaSesionGym() {
     }
   };
 
+  const guardarRutinaSemanalActual = async () => {
+    if (guardandoRutinaSemanal || eliminandoRutinaSemanalActual) {
+      return;
+    }
+
+    try {
+      setGuardandoRutinaSemanal(true);
+      const rutinaGuardada = await guardarRutinaGymSemanal({
+        id: rutinaSemanalActiva?.id,
+        diaSemana: diaSemanaSeleccionado,
+        notas: notasRutinaSemanal,
+        ejercicios: transformarParaGuardar(ejerciciosRutinaSemanal),
+      });
+
+      setRutinasSemanales((actual) =>
+        ordenarRutinasPorDia([
+          ...actual.filter((rutina) => rutina.diaSemana !== rutinaGuardada.diaSemana),
+          rutinaGuardada,
+        ])
+      );
+
+      Alert.alert(
+        'Rutina semanal guardada',
+        `Quedo asignada para ${obtenerNombreDiaSemana(diaSemanaSeleccionado, { capitalizar: false })}.`
+      );
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : 'No se pudo guardar la rutina semanal.';
+      Alert.alert('Error', mensaje);
+    } finally {
+      setGuardandoRutinaSemanal(false);
+    }
+  };
+
+  const eliminarRutinaSemanalSeleccionada = async () => {
+    if (!rutinaSemanalActiva || guardandoRutinaSemanal || eliminandoRutinaSemanalActual) {
+      return;
+    }
+
+    Alert.alert('Eliminar rutina semanal', 'Ese dia quedara sin plan de gym.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setEliminandoRutinaSemanalActual(true);
+            await eliminarRutinaGymSemanal(rutinaSemanalActiva.id);
+            setRutinasSemanales((actual) => actual.filter((rutina) => rutina.id !== rutinaSemanalActiva.id));
+            Alert.alert('Rutina eliminada', 'Ese dia ahora figura sin entrenamiento de gym.');
+          } catch (error) {
+            const mensaje = error instanceof Error ? error.message : 'No se pudo eliminar la rutina semanal.';
+            Alert.alert('Error', mensaje);
+          } finally {
+            setEliminandoRutinaSemanalActual(false);
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <ContenedorPantalla modo="oscuro" desplazable estiloContenido={estilos.contenido}>
       <View style={estilos.encabezadoSuperior}>
@@ -342,72 +450,214 @@ export function PantallaSesionGym() {
         )}
       </View>
 
-      <View style={estilos.bloqueCampo}>
-        <Text style={estilos.etiqueta}>DIA DE LA RUTINA</Text>
-        <Pressable style={estilos.cajaFechaHora} onPress={() => setMostrarCalendarioSesion(true)}>
-          <CalendarDays color={coloresBase.acentoNeon} size={20} />
-          <Text style={estilos.textoFechaRutina}>{fechaSesion}</Text>
-        </Pressable>
-        {mostrarCalendarioSesion ? (
-          <View style={estilos.bloqueCalendario}>
-            <DateTimePicker
-              value={obtenerFechaSesionDesdeIso(fechaSesion)}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={onCambiarFechaSesion}
-            />
-            {Platform.OS === 'ios' ? (
-              <Pressable style={estilos.botonCerrarCalendario} onPress={() => setMostrarCalendarioSesion(false)}>
-                <Text style={estilos.textoCerrarCalendario}>Listo</Text>
+      <View style={estilos.tarjetaRutinaSemanal}>
+        <Text style={estilos.tituloBloque}>Rutina semanal</Text>
+        <Text style={estilos.subtituloBloque}>
+          Elige un dia y deja cargados los ejercicios fijos de esa jornada.
+        </Text>
+
+        <View style={estilos.filaDiasSemana}>
+          {diasSemanaOrdenados.map((diaSemana) => {
+            const diaTieneRutina = rutinasSemanales.some((rutina) => rutina.diaSemana === diaSemana);
+            const estaActivo = diaSemana === diaSemanaSeleccionado;
+
+            return (
+              <Pressable
+                key={diaSemana}
+                style={[
+                  estilos.chipDiaSemana,
+                  estaActivo ? estilos.chipDiaSemanaActivo : null,
+                  diaTieneRutina && !estaActivo ? estilos.chipDiaSemanaCargado : null,
+                ]}
+                onPress={() => setDiaSemanaSeleccionado(diaSemana)}>
+                <Text
+                  style={[
+                    estilos.textoChipDiaSemana,
+                    estaActivo ? estilos.textoChipDiaSemanaActivo : null,
+                  ]}>
+                  {obtenerNombreDiaSemana(diaSemana, { abreviado: true })}
+                </Text>
               </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+            );
+          })}
+        </View>
 
-      <View style={estilos.bloqueCampo}>
-        <Text style={estilos.etiqueta}>NOTAS DE SESION (OPCIONAL)</Text>
-        <TextInput
-          value={notas}
-          onChangeText={setNotas}
-          style={estilos.inputNotas}
-          placeholder="Objetivo del dia, sensaciones, etc."
-          placeholderTextColor="#5F667A"
-          multiline
-          textAlignVertical="top"
-        />
-      </View>
+        <Text style={estilos.textoEstadoRutinaSemanal}>
+          {rutinaSemanalActiva
+            ? `${obtenerNombreDiaSemana(diaSemanaSeleccionado)} cargado con ${rutinaSemanalActiva.ejercicios.length} ejercicios.`
+            : `${obtenerNombreDiaSemana(diaSemanaSeleccionado)} sin rutina. Si no cargas nada, en Home dira "No se entreno."`}
+        </Text>
 
-      <View style={estilos.bloqueCampo}>
-        <Text style={estilos.etiqueta}>PLANTILLAS</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.filaPlantillas}>
-          {plantillasDisponibles.map((plantilla) => (
-            <Pressable key={plantilla.id} style={estilos.chipPlantilla} onPress={() => aplicarPlantilla(plantilla)}>
-              <Text style={estilos.textoChipPlantilla}>{plantilla.nombre}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
-
-      <View style={estilos.bloqueCampo}>
-        <Text style={estilos.etiqueta}>GUARDAR COMO PLANTILLA</Text>
-        <View style={estilos.filaGuardarPlantilla}>
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>NOTAS DEL DIA (OPCIONAL)</Text>
           <TextInput
-            value={nombrePlantilla}
-            onChangeText={setNombrePlantilla}
-            style={estilos.inputSimple}
-            placeholder="Ej: Piernas semana 6"
+            value={notasRutinaSemanal}
+            onChangeText={setNotasRutinaSemanal}
+            style={estilos.inputNotas}
+            placeholder="Ej: fuerza de piernas, movilidad, core."
             placeholderTextColor="#5F667A"
+            multiline
+            textAlignVertical="top"
           />
-          <Pressable style={estilos.botonGuardarPlantilla} onPress={guardarPlantilla}>
-            <Save color={coloresBase.fondoOscuro} size={20} />
+        </View>
+
+        <EditorEjerciciosGym
+          titulo={`Ejercicios de ${obtenerNombreDiaSemana(diaSemanaSeleccionado, { capitalizar: false })}`}
+          ejercicios={ejerciciosRutinaSemanal}
+          onAgregar={() => setEjerciciosRutinaSemanal((actual) => agregarEjercicioLista(actual))}
+          onQuitar={(idLocal) =>
+            setEjerciciosRutinaSemanal((actual) => quitarEjercicioLista(actual, idLocal))
+          }
+          onActualizar={(idLocal, campo, valor) =>
+            setEjerciciosRutinaSemanal((actual) => actualizarEjercicioLista(actual, idLocal, campo, valor))
+          }
+        />
+
+        <View style={estilos.filaAccionesPlan}>
+          <Pressable
+            style={estilos.botonPlanPrincipal}
+            onPress={guardarRutinaSemanalActual}
+            disabled={guardandoRutinaSemanal || eliminandoRutinaSemanalActual}>
+            <Save color={coloresBase.fondoOscuro} size={18} />
+            <Text style={estilos.textoBotonPlanPrincipal}>
+              {guardandoRutinaSemanal ? 'Guardando...' : 'Guardar dia'}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[estilos.botonPlanSecundario, !rutinaSemanalActiva ? estilos.botonDeshabilitado : null]}
+            onPress={eliminarRutinaSemanalSeleccionada}
+            disabled={!rutinaSemanalActiva || guardandoRutinaSemanal || eliminandoRutinaSemanalActual}>
+            <Trash2 color={rutinaSemanalActiva ? '#FF8A8A' : '#5B6070'} size={18} />
+            <Text
+              style={[
+                estilos.textoBotonPlanSecundario,
+                !rutinaSemanalActiva ? estilos.textoBotonDeshabilitado : null,
+              ]}>
+              {eliminandoRutinaSemanalActual ? 'Eliminando...' : 'Borrar dia'}
+            </Text>
           </Pressable>
         </View>
       </View>
 
+      <View style={estilos.separadorSeccion} />
+
+      <View style={estilos.bloqueContenido}>
+        <Text style={estilos.tituloBloque}>Sesion puntual</Text>
+        <Text style={estilos.subtituloBloque}>
+          Sigue disponible para cargar una rutina especifica de una fecha.
+        </Text>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>DIA DE LA RUTINA</Text>
+          <Pressable style={estilos.cajaFechaHora} onPress={() => setMostrarCalendarioSesion(true)}>
+            <CalendarDays color={coloresBase.acentoNeon} size={20} />
+            <Text style={estilos.textoFechaRutina}>{fechaSesion}</Text>
+          </Pressable>
+          {mostrarCalendarioSesion ? (
+            <View style={estilos.bloqueCalendario}>
+              <DateTimePicker
+                value={obtenerFechaSesionDesdeIso(fechaSesion)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={onCambiarFechaSesion}
+              />
+              {Platform.OS === 'ios' ? (
+                <Pressable style={estilos.botonCerrarCalendario} onPress={() => setMostrarCalendarioSesion(false)}>
+                  <Text style={estilos.textoCerrarCalendario}>Listo</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>NOTAS DE SESION (OPCIONAL)</Text>
+          <TextInput
+            value={notas}
+            onChangeText={setNotas}
+            style={estilos.inputNotas}
+            placeholder="Objetivo del dia, sensaciones, etc."
+            placeholderTextColor="#5F667A"
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>PLANTILLAS</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.filaPlantillas}>
+            {plantillasDisponibles.map((plantilla) => (
+              <Pressable key={plantilla.id} style={estilos.chipPlantilla} onPress={() => aplicarPlantilla(plantilla)}>
+                <Text style={estilos.textoChipPlantilla}>{plantilla.nombre}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+
+        <View style={estilos.bloqueCampo}>
+          <Text style={estilos.etiqueta}>GUARDAR COMO PLANTILLA</Text>
+          <View style={estilos.filaGuardarPlantilla}>
+            <TextInput
+              value={nombrePlantilla}
+              onChangeText={setNombrePlantilla}
+              style={estilos.inputSimple}
+              placeholder="Ej: Piernas semana 6"
+              placeholderTextColor="#5F667A"
+            />
+            <Pressable style={estilos.botonGuardarPlantilla} onPress={guardarPlantilla}>
+              <Save color={coloresBase.fondoOscuro} size={20} />
+            </Pressable>
+          </View>
+        </View>
+
+        <EditorEjerciciosGym
+          titulo="Ejercicios de la sesion"
+          ejercicios={ejercicios}
+          onAgregar={() => setEjercicios((actual) => agregarEjercicioLista(actual))}
+          onQuitar={(idLocal) => setEjercicios((actual) => quitarEjercicioLista(actual, idLocal))}
+          onActualizar={(idLocal, campo, valor) =>
+            setEjercicios((actual) => actualizarEjercicioLista(actual, idLocal, campo, valor))
+          }
+        />
+
+        {gymId ? (
+          <Pressable style={estilos.botonDuplicar} onPress={duplicarSesion} disabled={duplicando || guardando}>
+            <Copy color={coloresBase.textoPrincipalOscuro} size={20} />
+            <Text style={estilos.textoDuplicar}>{duplicando ? 'Duplicando...' : 'Duplicar rutina para hoy'}</Text>
+          </Pressable>
+        ) : null}
+
+        <BotonPrincipal
+          titulo={guardando ? 'Guardando...' : gymId ? 'Guardar cambios' : 'Guardar rutina'}
+          onPress={guardarSesion}
+          cargando={guardando}
+          deshabilitado={guardando || eliminando || duplicando || cargando}
+        />
+      </View>
+    </ContenedorPantalla>
+  );
+}
+
+interface PropiedadesEditorEjerciciosGym {
+  titulo: string;
+  ejercicios: EjercicioEditable[];
+  onAgregar: () => void;
+  onQuitar: (idLocal: string) => void;
+  onActualizar: (idLocal: string, campo: keyof EjercicioEditable, valor: string) => void;
+}
+
+function EditorEjerciciosGym({
+  titulo,
+  ejercicios,
+  onAgregar,
+  onQuitar,
+  onActualizar,
+}: PropiedadesEditorEjerciciosGym) {
+  return (
+    <View style={estilos.bloqueCampo}>
       <View style={estilos.filaTituloEjercicios}>
-        <Text style={estilos.tituloSeccion}>Ejercicios</Text>
-        <Pressable style={estilos.botonAgregarEjercicio} onPress={agregarEjercicio}>
+        <Text style={estilos.tituloSeccion}>{titulo}</Text>
+        <Pressable style={estilos.botonAgregarEjercicio} onPress={onAgregar}>
           <CirclePlus color={coloresBase.acentoNeon} size={20} />
           <Text style={estilos.textoAgregarEjercicio}>Agregar</Text>
         </Pressable>
@@ -417,14 +667,14 @@ export function PantallaSesionGym() {
         <View key={ejercicio.idLocal} style={estilos.tarjetaEjercicio}>
           <View style={estilos.filaEjercicioHeader}>
             <Text style={estilos.tituloEjercicio}>{`Ejercicio ${indice + 1}`}</Text>
-            <Pressable onPress={() => quitarEjercicio(ejercicio.idLocal)} disabled={ejercicios.length <= 1}>
+            <Pressable onPress={() => onQuitar(ejercicio.idLocal)} disabled={ejercicios.length <= 1}>
               <Trash2 color={ejercicios.length <= 1 ? '#5B6070' : '#FF6666'} size={18} />
             </Pressable>
           </View>
 
           <TextInput
             value={ejercicio.nombre}
-            onChangeText={(valor) => actualizarEjercicio(ejercicio.idLocal, 'nombre', valor)}
+            onChangeText={(valor) => onActualizar(ejercicio.idLocal, 'nombre', valor)}
             style={estilos.inputSimple}
             placeholder="Nombre del ejercicio"
             placeholderTextColor="#5F667A"
@@ -434,45 +684,31 @@ export function PantallaSesionGym() {
             <CampoNumero
               etiqueta="Series"
               valor={ejercicio.series}
-              onChangeText={(valor) => actualizarEjercicio(ejercicio.idLocal, 'series', valor)}
+              onChangeText={(valor) => onActualizar(ejercicio.idLocal, 'series', valor)}
             />
             <CampoNumero
               etiqueta="Reps"
               valor={ejercicio.repeticiones}
-              onChangeText={(valor) => actualizarEjercicio(ejercicio.idLocal, 'repeticiones', valor)}
+              onChangeText={(valor) => onActualizar(ejercicio.idLocal, 'repeticiones', valor)}
             />
             <CampoNumero
               etiqueta="Peso kg"
               valor={ejercicio.pesoKg}
-              onChangeText={(valor) => actualizarEjercicio(ejercicio.idLocal, 'pesoKg', valor)}
+              onChangeText={(valor) => onActualizar(ejercicio.idLocal, 'pesoKg', valor)}
               decimal
             />
           </View>
 
           <TextInput
             value={ejercicio.notas}
-            onChangeText={(valor) => actualizarEjercicio(ejercicio.idLocal, 'notas', valor)}
+            onChangeText={(valor) => onActualizar(ejercicio.idLocal, 'notas', valor)}
             style={estilos.inputSimple}
             placeholder="Notas del ejercicio (opcional)"
             placeholderTextColor="#5F667A"
           />
         </View>
       ))}
-
-      {gymId ? (
-        <Pressable style={estilos.botonDuplicar} onPress={duplicarSesion} disabled={duplicando || guardando}>
-          <Copy color={coloresBase.textoPrincipalOscuro} size={20} />
-          <Text style={estilos.textoDuplicar}>{duplicando ? 'Duplicando...' : 'Duplicar rutina para hoy'}</Text>
-        </Pressable>
-      ) : null}
-
-      <BotonPrincipal
-        titulo={guardando ? 'Guardando...' : gymId ? 'Guardar cambios' : 'Guardar rutina'}
-        onPress={guardarSesion}
-        cargando={guardando}
-        deshabilitado={guardando || eliminando || duplicando || cargando}
-      />
-    </ContenedorPantalla>
+    </View>
   );
 }
 
@@ -526,6 +762,109 @@ const estilos = StyleSheet.create({
     color: coloresBase.textoPrincipalOscuro,
     fontSize: 22,
     fontWeight: '800',
+  },
+  tarjetaRutinaSemanal: {
+    borderRadius: radiosBase.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(216,255,62,0.35)',
+    backgroundColor: 'rgba(216,255,62,0.08)',
+    padding: espaciadoBase.lg,
+    gap: espaciadoBase.md,
+  },
+  bloqueContenido: {
+    gap: espaciadoBase.md,
+  },
+  tituloBloque: {
+    color: coloresBase.textoPrincipalOscuro,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  subtituloBloque: {
+    color: '#AAB58D',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  filaDiasSemana: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: espaciadoBase.xs,
+  },
+  chipDiaSemana: {
+    minWidth: 62,
+    borderRadius: radiosBase.pill,
+    borderWidth: 1,
+    borderColor: '#2E3343',
+    backgroundColor: '#232633',
+    paddingHorizontal: espaciadoBase.md,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  chipDiaSemanaActivo: {
+    borderColor: coloresBase.acentoNeon,
+    backgroundColor: coloresBase.acentoNeon,
+  },
+  chipDiaSemanaCargado: {
+    borderColor: 'rgba(216,255,62,0.45)',
+    backgroundColor: 'rgba(216,255,62,0.12)',
+  },
+  textoChipDiaSemana: {
+    color: '#B2BAD0',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  textoChipDiaSemanaActivo: {
+    color: coloresBase.fondoOscuro,
+  },
+  textoEstadoRutinaSemanal: {
+    color: '#CBD596',
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  filaAccionesPlan: {
+    flexDirection: 'row',
+    gap: espaciadoBase.sm,
+  },
+  botonPlanPrincipal: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: radiosBase.md,
+    backgroundColor: coloresBase.acentoNeon,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  textoBotonPlanPrincipal: {
+    color: coloresBase.fondoOscuro,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  botonPlanSecundario: {
+    flex: 1,
+    minHeight: 54,
+    borderRadius: radiosBase.md,
+    borderWidth: 1,
+    borderColor: '#364055',
+    backgroundColor: '#202430',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  textoBotonPlanSecundario: {
+    color: '#FF9A9A',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  botonDeshabilitado: {
+    opacity: 0.55,
+  },
+  textoBotonDeshabilitado: {
+    color: '#7F869B',
+  },
+  separadorSeccion: {
+    height: 1,
+    backgroundColor: '#252A39',
   },
   bloqueCampo: {
     gap: espaciadoBase.sm,
@@ -629,6 +968,8 @@ const estilos = StyleSheet.create({
     color: coloresBase.textoPrincipalOscuro,
     fontSize: 24,
     fontWeight: '800',
+    flex: 1,
+    paddingRight: espaciadoBase.sm,
   },
   botonAgregarEjercicio: {
     flexDirection: 'row',
@@ -705,4 +1046,3 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
   },
 });
-
