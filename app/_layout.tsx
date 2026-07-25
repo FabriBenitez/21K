@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
         <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+        <Stack.Screen name="plan-semanal" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen name="sesion-gym" options={{ headerShown: false, presentation: 'card' }} />
         <Stack.Screen
           name="registro-running"

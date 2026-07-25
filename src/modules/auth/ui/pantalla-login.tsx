@@ -15,7 +15,7 @@ export function PantallaLogin() {
   const [correoElectronico, setCorreoElectronico] = useState('');
   const [clave, setClave] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const { iniciarSesion } = useEstadoApp();
+  const { iniciarSesion, iniciarSesionGoogle } = useEstadoApp();
 
   const iniciarSesionCuenta = async () => {
     if (enviando) {
@@ -87,7 +87,7 @@ export function PantallaLogin() {
       <SeparadorSocial texto="O CONTINUAR CON" />
 
       <View style={estilos.redes}>
-        <Pressable style={estilos.botonRed}>
+        <Pressable style={estilos.botonRed} onPress={iniciarSesionGoogle}>
           <Text style={estilos.textoRed}>Google</Text>
         </Pressable>
         <Pressable style={estilos.botonRed}>

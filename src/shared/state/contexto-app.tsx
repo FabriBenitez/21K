@@ -40,6 +40,7 @@ interface ValorContextoApp extends EstadoApp {
   ) => Promise<ResultadoAuth>;
   enviarRecuperacionClave: (correoElectronico: string) => Promise<ResultadoAuth>;
   actualizarClave: (nuevaClave: string) => Promise<ResultadoAuth>;
+  iniciarSesionGoogle: () => Promise<ResultadoAuth>;
   cerrarSesion: () => Promise<ResultadoAuth>;
 }
 
@@ -255,6 +256,28 @@ export function ProveedorEstadoApp({ children }: PropsWithChildren) {
     [sincronizarSesion]
   );
 
+  const iniciarSesionGoogle = useCallback(
+    async (): Promise<ResultadoAuth> => {
+      const enlaceConfirmacion = Linking.createURL('auth/callback');
+
+      const { data, error } = await clienteSupabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: enlaceConfirmacion,
+        },
+      });
+
+      if (error) {
+        return { ok: false, mensaje: normalizarMensajeError(error) };
+      }
+
+      // signInWithOAuth con Expo Redirect no devuelve sesion de inmediato, 
+      // abre navegador. El deep link (procesarDeepLink) completara el flujo.
+      return { ok: true, mensaje: 'Redirigiendo a Google...' };
+    },
+    []
+  );
+
   const registrarCuenta = useCallback(
     async (
       nombreMostrado: string,
@@ -346,6 +369,7 @@ export function ProveedorEstadoApp({ children }: PropsWithChildren) {
       estadoSesion,
       usuario,
       iniciarSesion,
+      iniciarSesionGoogle,
       registrarCuenta,
       enviarRecuperacionClave,
       actualizarClave,
@@ -357,6 +381,7 @@ export function ProveedorEstadoApp({ children }: PropsWithChildren) {
       enviarRecuperacionClave,
       estadoSesion,
       iniciarSesion,
+      iniciarSesionGoogle,
       registrarCuenta,
       usuario,
     ]

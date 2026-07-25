@@ -12,7 +12,7 @@ interface ConfiguracionTab {
 
 const configuracionTabs: Record<string, ConfiguracionTab> = {
   index: { etiqueta: 'INICIO', Icono: Home },
-  calendario: { etiqueta: 'PLAN', Icono: CalendarDays },
+  entrenamientos: { etiqueta: 'DIARIO', Icono: CalendarDays },
   agregar: { etiqueta: '', Icono: Plus },
   estadisticas: { etiqueta: 'ESTAD.', Icono: BarChart3 },
   perfil: { etiqueta: 'PERFIL', Icono: UserRound },

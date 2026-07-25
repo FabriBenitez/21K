@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import Svg, { Polyline } from 'react-native-svg';
 
 import { obtenerObjetivo21k } from '@/src/modules/goals/data/objetivos.api';
+import { getFoodLogsByDateRange } from '@/src/modules/nutrition/data/food.api';
 import {
   listarEntrenamientosDominioPorRango,
 } from '@/src/modules/trainings/data/entrenamientos.api';
@@ -40,6 +41,8 @@ interface ResumenEstadisticas {
   consistenciaSemanal: number;
   tendenciaKilometraje: number;
   objetivoProgreso: number;
+  caloriasHoy: number;
+  caloriasSemana: number;
 }
 
 const resumenInicial: ResumenEstadisticas = {
@@ -55,6 +58,8 @@ const resumenInicial: ResumenEstadisticas = {
   consistenciaSemanal: 0,
   tendenciaKilometraje: 0,
   objetivoProgreso: 0,
+  caloriasHoy: 0,
+  caloriasSemana: 0,
 };
 
 function obtenerClaveSemana(fechaIso: string): string {
@@ -173,6 +178,7 @@ export function PantallaEstadisticas() {
       const hoy = obtenerFechaIsoActual();
       const fechaDesde = obtenerFechaIsoHaceDias(84);
       const entrenamientos = await listarEntrenamientosDominioPorRango(fechaDesde, hoy);
+      const foodLogs = await getFoodLogsByDateRange(fechaDesde, hoy);
 
       const [objetivo] = await Promise.all([obtenerObjetivo21k()]);
 
@@ -192,6 +198,15 @@ export function PantallaEstadisticas() {
         ? Math.min((fondoMasLargo / distanciaObjetivoKm) * 100, 100)
         : 0;
 
+      const inicioSemana = obtenerFechaIsoHaceDias(7);
+      const caloriasSemana = foodLogs
+        .filter(log => log.fecha >= inicioSemana)
+        .reduce((sum, log) => sum + log.calorias_estimadas, 0);
+      
+      const caloriasHoy = foodLogs
+        .filter(log => log.fecha === hoy)
+        .reduce((sum, log) => sum + log.calorias_estimadas, 0);
+
       setResumen({
         nombreObjetivo,
         distanciaObjetivoKm,
@@ -205,6 +220,8 @@ export function PantallaEstadisticas() {
         consistenciaSemanal,
         tendenciaKilometraje,
         objetivoProgreso: progresoObjetivo,
+        caloriasHoy,
+        caloriasSemana,
       });
     } catch {
       setResumen(resumenInicial);
@@ -297,6 +314,8 @@ export function PantallaEstadisticas() {
           unidad="Ultimas 4 vs previas"
           acento
         />
+        <TarjetaMetrica titulo="Calorias Hoy" valor={`${resumen.caloriasHoy}`} unidad="kcal estimadas" />
+        <TarjetaMetrica titulo="Calorias Semanales" valor={`${resumen.caloriasSemana}`} unidad="kcal estimadas" acento />
       </View>
 
       <View style={estilos.bloqueMaximos}>

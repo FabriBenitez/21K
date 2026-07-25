@@ -33,12 +33,7 @@ export default function TabLayout() {
           title: 'INICIO',
         }}
       />
-      <Tabs.Screen
-        name="calendario"
-        options={{
-          title: 'PLAN',
-        }}
-      />
+
       <Tabs.Screen
         name="agregar"
         options={{

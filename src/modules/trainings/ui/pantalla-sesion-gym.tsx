@@ -226,6 +226,14 @@ export function PantallaSesionGym() {
           setFechaSesion(sesion.fechaSesion);
           setNotas(sesion.notas ?? '');
           setEjercicios(sesion.ejercicios.map(mapearEjercicioEditable));
+        } else {
+          const fechaParaDia = fechaPrefijada ?? obtenerFechaIsoActual();
+          const diaSemanaParaPrecarga = obtenerDiaSemanaActual(obtenerFechaSesionDesdeIso(fechaParaDia));
+          const rutinaDelDia = rutinas.find((r) => r.diaSemana === diaSemanaParaPrecarga);
+          if (rutinaDelDia && rutinaDelDia.ejercicios.length > 0) {
+            setEjercicios(rutinaDelDia.ejercicios.map(mapearEjercicioEditable));
+            // Optional: setNotas(`Precargado desde el plan de ${obtenerNombreDiaSemana(diaSemanaParaPrecarga)}`);
+          }
         }
       } catch (error) {
         if (!montado) {

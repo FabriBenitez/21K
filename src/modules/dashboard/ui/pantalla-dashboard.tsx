@@ -231,9 +231,15 @@ export function PantallaDashboard() {
             Seguimiento real de tu proceso 21K
           </Text>
         </View>
-        <Pressable style={[estilos.botonNuevo, esPantallaCompacta ? estilos.botonNuevoCompacto : null]} onPress={() => router.push('/(tabs)/agregar')}>
-          <Text style={estilos.textoBotonNuevo}>{esPantallaCompacta ? '+ Crear' : '+ Nuevo'}</Text>
-        </Pressable>
+        <View style={estilos.accionesEncabezado}>
+          <Pressable style={[estilos.botonPlan, esPantallaCompacta ? estilos.botonPlanCompacto : null]} onPress={() => router.push('/plan-semanal')}>
+            <CalendarClock color={coloresBase.textoPrincipalOscuro} size={18} />
+            <Text style={estilos.textoBotonPlan}>{esPantallaCompacta ? 'Plan' : 'Plan Semanal'}</Text>
+          </Pressable>
+          <Pressable style={[estilos.botonNuevo, esPantallaCompacta ? estilos.botonNuevoCompacto : null]} onPress={() => router.push('/(tabs)/agregar')}>
+            <Text style={estilos.textoBotonNuevo}>{esPantallaCompacta ? '+ Crear' : '+ Nuevo'}</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={estilos.tarjetaMeta}>
@@ -394,6 +400,30 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
+  accionesEncabezado: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  botonPlan: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: radiosBase.pill,
+    backgroundColor: '#1E2330',
+    borderWidth: 1,
+    borderColor: '#2D3448',
+    paddingHorizontal: espaciadoBase.sm,
+    paddingVertical: 10,
+  },
+  botonPlanCompacto: {
+    paddingHorizontal: 8,
+  },
+  textoBotonPlan: {
+    color: coloresBase.textoPrincipalOscuro,
+    fontWeight: '700',
+    fontSize: 13,
+  },
   botonNuevo: {
     borderRadius: radiosBase.pill,
     backgroundColor: coloresBase.acentoNeon,
@@ -401,7 +431,7 @@ const estilos = StyleSheet.create({
     paddingVertical: 10,
   },
   botonNuevoCompacto: {
-    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
   },
   textoBotonNuevo: {
     color: coloresBase.fondoOscuro,

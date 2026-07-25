@@ -17,7 +17,7 @@ export function PantallaRegistro() {
   const [clave, setClave] = useState('');
   const [aceptaTerminos, setAceptaTerminos] = useState(true);
   const [creandoCuenta, setCreandoCuenta] = useState(false);
-  const { registrarCuenta } = useEstadoApp();
+  const { registrarCuenta, iniciarSesionGoogle } = useEstadoApp();
 
   const crearCuenta = async () => {
     if (creandoCuenta) {
@@ -130,7 +130,7 @@ export function PantallaRegistro() {
       <SeparadorSocial texto="O REGISTRARTE CON" />
 
       <View style={estilos.redes}>
-        <Pressable style={estilos.botonRed}>
+        <Pressable style={estilos.botonRed} onPress={iniciarSesionGoogle}>
           <Text style={estilos.textoRed}>Google</Text>
         </Pressable>
         <Pressable style={estilos.botonRed}>
