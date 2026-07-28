@@ -18,6 +18,8 @@ export default function RutaRegistroComida() {
   // Estados editables por si la IA se equivoca
   const [descripcionManual, setDescripcionManual] = useState('');
   const [caloriasManual, setCaloriasManual] = useState('');
+  const [carbohidratosManual, setCarbohidratosManual] = useState('');
+  const [proteinasManual, setProteinasManual] = useState('');
 
   const tomarFoto = async () => {
     const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -56,6 +58,8 @@ export default function RutaRegistroComida() {
       setResultado(res);
       setDescripcionManual(res.comida);
       setCaloriasManual(res.calorias.toString());
+      setCarbohidratosManual(res.carbohidratos.toString());
+      setProteinasManual(res.proteinas.toString());
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo analizar la imagen.');
     } finally {
@@ -66,6 +70,8 @@ export default function RutaRegistroComida() {
   const guardarComida = async () => {
     const descLimpia = descripcionManual.trim();
     const calLimpia = caloriasManual.trim();
+    const carbsLimpia = carbohidratosManual.trim();
+    const protLimpia = proteinasManual.trim();
 
     if (!descLimpia || !calLimpia) {
       Alert.alert('Datos incompletos', 'Asegúrate de ingresar un nombre y calorías válidas.');
@@ -73,6 +79,9 @@ export default function RutaRegistroComida() {
     }
 
     const caloriasParseadas = parseInt(calLimpia, 10);
+    const carbsParseados = parseInt(carbsLimpia, 10) || 0;
+    const protParseadas = parseInt(protLimpia, 10) || 0;
+
     if (isNaN(caloriasParseadas) || caloriasParseadas <= 0) {
       Alert.alert('Formato inválido', 'Las calorías deben ser un número entero mayor a 0 (ej: 500).');
       return;
@@ -80,7 +89,7 @@ export default function RutaRegistroComida() {
 
     setIsSaving(true);
     try {
-      await addFoodLog(descLimpia, caloriasParseadas);
+      await addFoodLog(descLimpia, caloriasParseadas, carbsParseados, protParseadas);
       Alert.alert('¡Guardado!', 'Tu comida ha sido registrada.', [
         { text: 'OK', onPress: () => router.back() }
       ]);
@@ -150,6 +159,29 @@ export default function RutaRegistroComida() {
             keyboardType="numeric"
             placeholderTextColor={coloresBase.textoSecundarioOscuro}
           />
+
+          <View style={estilos.filaMacros}>
+            <View style={estilos.columnaMacro}>
+              <Text style={estilos.labelInput}>Carbohidratos (g)</Text>
+              <TextInput
+                style={estilos.input}
+                value={carbohidratosManual}
+                onChangeText={setCarbohidratosManual}
+                keyboardType="numeric"
+                placeholderTextColor={coloresBase.textoSecundarioOscuro}
+              />
+            </View>
+            <View style={estilos.columnaMacro}>
+              <Text style={estilos.labelInput}>Proteínas (g)</Text>
+              <TextInput
+                style={estilos.input}
+                value={proteinasManual}
+                onChangeText={setProteinasManual}
+                keyboardType="numeric"
+                placeholderTextColor={coloresBase.textoSecundarioOscuro}
+              />
+            </View>
+          </View>
 
           <Pressable 
             style={[estilos.botonGuardar, isSaving && estilos.botonGuardarDeshabilitado]} 
@@ -311,6 +343,14 @@ const estilos = StyleSheet.create({
     marginTop: espaciadoBase.lg,
     gap: 12,
     ...sombrasNeon.glowSuave,
+  },
+  filaMacros: {
+    flexDirection: 'row',
+    gap: espaciadoBase.md,
+    marginTop: espaciadoBase.sm,
+  },
+  columnaMacro: {
+    flex: 1,
   },
   botonGuardarDeshabilitado: {
     opacity: 0.7,

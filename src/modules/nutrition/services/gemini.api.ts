@@ -1,6 +1,8 @@
 export interface CalorieEstimation {
   comida: string;
   calorias: number;
+  carbohidratos: number;
+  proteinas: number;
 }
 
 export async function estimarCalorias(imageBase64: string, mimeType: string): Promise<CalorieEstimation> {
@@ -15,9 +17,11 @@ export async function estimarCalorias(imageBase64: string, mimeType: string): Pr
 Responde ÚNICAMENTE con un JSON en este formato exacto:
 {
   "comida": "Nombre descriptivo y simple de la comida",
-  "calorias": 500
+  "calorias": 500,
+  "carbohidratos": 60,
+  "proteinas": 25
 }
-No agregues comillas invertidas (\`\`\`) ni formato Markdown, solo el JSON puro. Estima las calorias de forma aproximada.`;
+No agregues comillas invertidas (\`\`\`) ni formato Markdown, solo el JSON puro. Estima las calorías, carbohidratos (en gramos) y proteínas (en gramos) de forma aproximada.`;
 
   const payload = {
     contents: [
@@ -61,9 +65,11 @@ No agregues comillas invertidas (\`\`\`) ni formato Markdown, solo el JSON puro.
     return {
       comida: parsed.comida || 'Comida desconocida',
       calorias: typeof parsed.calorias === 'number' ? parsed.calorias : 0,
+      carbohidratos: typeof parsed.carbohidratos === 'number' ? parsed.carbohidratos : 0,
+      proteinas: typeof parsed.proteinas === 'number' ? parsed.proteinas : 0,
     };
   } catch (error) {
     console.error('Fallo al parsear JSON de Gemini:', textResponse);
-    throw new Error('Gemini no devolvio un formato JSON valido.');
+    throw new Error('Gemini no devolvió un formato JSON válido.');
   }
 }

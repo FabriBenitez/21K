@@ -7,10 +7,17 @@ export interface FoodLog {
   fecha: string;
   descripcion: string;
   calorias_estimadas: number;
+  carbohidratos_estimados: number;
+  proteinas_estimadas: number;
   created_at: string;
 }
 
-export async function addFoodLog(descripcion: string, calorias_estimadas: number): Promise<FoodLog> {
+export async function addFoodLog(
+  descripcion: string, 
+  calorias_estimadas: number,
+  carbohidratos_estimados: number,
+  proteinas_estimadas: number
+): Promise<FoodLog> {
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('Usuario no autenticado');
 
@@ -21,6 +28,8 @@ export async function addFoodLog(descripcion: string, calorias_estimadas: number
         user_id: user.user.id,
         descripcion,
         calorias_estimadas,
+        carbohidratos_estimados,
+        proteinas_estimadas,
         fecha: obtenerFechaIsoActual(),
       }
     ])
